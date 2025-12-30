@@ -1,0 +1,34 @@
+export type Workshop = {
+  workshopId: string;
+  title: string;
+  code: string;
+  color: string;
+  term: string;
+};
+
+export type Assignment = {
+  id: string;
+  title: string;
+  workshop: string;
+  workshopId: string;
+  points: number;
+  dueDate: string;
+  type: "assignment" | "announcement";
+};
+
+// Mock Data
+export const workshops: Workshop[] = [
+    { workshopId: "1", title: "Intro to Physics: Mechanics", code: "PHY-101", term: "Sem 1 2025", color: "bg-emerald-600" },
+    { workshopId: "2", title: "Chemistry Lab Safety", code: "CHEM-LAB", term: "Sem 1 2025", color: "bg-orange-500" },
+    { workshopId: "3", title: "Biology: Plant Systems", code: "BIO-202", term: "Sem 1 2025", color: "bg-purple-700" },
+    { workshopId: "4", title: "Robotics & Embedded Systems", code: "ENG-300", term: "Sem 1 2025", color: "bg-blue-600" },
+    { workshopId: "5", title: "Environmental Science", code: "ENV-101", term: "Sem 1 2025", color: "bg-teal-700" },
+    { workshopId: "6", title: "Space Exploration Workshop", code: "ASTRO-09", term: "Sem 1 2025", color: "bg-indigo-600" },
+];
+
+export const todoList: Assignment[] = [
+  { id: "a1", title: "Lab Report: Pendulum Motion", workshop: "PHY-101", workshopId: "1", points: 50, dueDate: "Dec 24 at 11:59pm", type: "assignment" },
+  { id: "a2", title: "Safety Quiz", workshop: "CHEM-LAB", workshopId: "2", points: 10, dueDate: "Dec 25 at 10:00am", type: "assignment" },
+  { id: "a3", title: "Read: Photosynthesis Chapter", workshop: "BIO-202", workshopId: "3", points: 0, dueDate: "Dec 28 at 9:00am", type: "assignment" },
+];
+
