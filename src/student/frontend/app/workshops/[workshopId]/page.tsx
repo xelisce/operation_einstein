@@ -23,7 +23,7 @@ export default async function WorkshopPage({
       ) : (
         <ul className="mt-2 space-y-2">
           {assignments.map((a) => (
-            <li key={a.id} className="rounded border p-3">
+            <li key={a.workshopId} className="rounded border p-3">
               <div className="font-medium">{a.title}</div>
               <div className="text-sm text-gray-600">{a.dueDate}</div>
             </li>

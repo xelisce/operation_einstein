@@ -7,10 +7,9 @@ export type Workshop = {
 };
 
 export type Assignment = {
-  id: string;
+  workshopId: string;
   title: string;
   workshop: string;
-  workshopId: string;
   points: number;
   dueDate: string;
   type: "assignment" | "announcement";
@@ -27,8 +26,8 @@ export const workshops: Workshop[] = [
 ];
 
 export const todoList: Assignment[] = [
-  { id: "a1", title: "Lab Report: Pendulum Motion", workshop: "PHY-101", workshopId: "1", points: 50, dueDate: "Dec 24 at 11:59pm", type: "assignment" },
-  { id: "a2", title: "Safety Quiz", workshop: "CHEM-LAB", workshopId: "2", points: 10, dueDate: "Dec 25 at 10:00am", type: "assignment" },
-  { id: "a3", title: "Read: Photosynthesis Chapter", workshop: "BIO-202", workshopId: "3", points: 0, dueDate: "Dec 28 at 9:00am", type: "assignment" },
+  { workshopId: "1", title: "Lab Report: Pendulum Motion", workshop: "PHY-101",  points: 50, dueDate: "Dec 24 at 11:59pm", type: "assignment" },
+  { workshopId: "2", title: "Safety Quiz", workshop: "CHEM-LAB", points: 10, dueDate: "Dec 25 at 10:00am", type: "assignment" },
+  { workshopId: "3", title: "Read: Photosynthesis Chapter", workshop: "BIO-202", points: 0, dueDate: "Dec 28 at 9:00am", type: "assignment" },
 ];
 
