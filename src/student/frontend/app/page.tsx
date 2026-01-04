@@ -34,23 +34,21 @@ type Assignment = {
   type: "assignment" | "announcement";
 };
 
-// Mock Data
-const workshops: Workshop[] = [
-  { workshopId: "1", title: "Intro to Physics: Mechanics", code: "PHY-101", term: "Sem 1 2025", color: "bg-emerald-600" },
-{ workshopId: "2", title: "Chemistry Lab Safety", code: "CHEM-LAB", term: "Sem 1 2025", color: "bg-orange-500" },
-  { workshopId: "3", title: "Biology: Plant Systems", code: "BIO-202", term: "Sem 1 2025", color: "bg-purple-700" },
-  { workshopId: "4", title: "Robotics & Embedded Systems", code: "ENG-300", term: "Sem 1 2025", color: "bg-blue-600" },
-  { workshopId: "5", title: "Environmental Science", code: "ENV-101", term: "Sem 1 2025", color: "bg-teal-700" },
-  { workshopId: "6", title: "Space Exploration Workshop", code: "ASTRO-09", term: "Sem 1 2025", color: "bg-indigo-600" },
-];
+export const dynamic = "force-dynamic";
 
-const todoList: Assignment[] = [
-  { id: "a1", title: "Lab Report: Pendulum Motion", workshop: "PHY-101", workshopId: "1", points: 50, dueDate: "Dec 24 at 11:59pm", type: "assignment" },
-  { id: "a2", title: "Safety Quiz", workshop: "CHEM-LAB", workshopId: "2", points: 10, dueDate: "Dec 25 at 10:00am", type: "assignment" },
-  { id: "a3", title: "Read: Photosynthesis Chapter", workshop: "BIO-202", workshopId: "3", points: 0, dueDate: "Dec 28 at 9:00am", type: "assignment" },
-];
+async function getDashboardData(): Promise<{
+  workshops: Workshop[];
+  todoList: Assignment[];
+}> {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+  const res = await fetch(`${base}/api/dashboard`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load dashboard data");
+  return (await res.json()) as { workshops: Workshop[]; todoList: Assignment[] };
+}
 
-export default function StudentDashboard() {
+export default async function StudentDashboard() {
+  const { workshops, todoList } = await getDashboardData();
+
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans">
       
