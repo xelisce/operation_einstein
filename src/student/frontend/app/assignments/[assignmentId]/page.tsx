@@ -1,8 +1,19 @@
 import { notFound } from "next/navigation";
-import type { Question, QuestionOption } from "../../models/types";
+import type { Assignment, Question, QuestionOption } from "../../models/types";
+import SubmitAssignmentButton from "./submitAssignmentButton";
 
 export const dynamic = "force-dynamic";
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+async function getAssignment(assignmentId: string): Promise<Assignment> {
+  const url = `${API_BASE}/api/assignments/${assignmentId}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch assignment: ${url} (${res.status}) ${text}`);
+  }
+  return res.json();
+}
 
 async function getQuestions(assignmentId: string): Promise<Question[]> {
   const url = `${API_BASE}/api/assignments/${assignmentId}/questions`;
@@ -32,7 +43,6 @@ export default async function AssignmentPage({
   params: Promise<{ assignmentId: string }>;
 }) {
   const { assignmentId } = await params;
-
   if (!assignmentId || assignmentId === "undefined") notFound();
 
   const questionsRaw = await getQuestions(assignmentId);
@@ -41,7 +51,6 @@ export default async function AssignmentPage({
   );
 
   const mcqs = questions.filter((q) => q.type === "multiple_choice");
-
   const optionsPairs = await Promise.all(
     mcqs.map(async (q) => {
       const opts = await getQuestionOptions(q.questionId);
@@ -49,15 +58,13 @@ export default async function AssignmentPage({
       return [q.questionId, sorted] as const;
     })
   );
+  const optionsByQuestionId: Record<string, QuestionOption[]> = Object.fromEntries(optionsPairs);
 
-  const optionsByQuestionId: Record<string, QuestionOption[]> =
-    Object.fromEntries(optionsPairs);
+  const assignment = await getAssignment(assignmentId);
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800 }}>Assignment</h1>
-      <p style={{ marginTop: 6, opacity: 0.7 }}>assignmentId: {assignmentId}</p>
-
+      <h1 style={{ fontSize: 24, fontWeight: 800 }}>{assignment.title}</h1>
       <div style={{ marginTop: 24, display: "grid", gap: 16 }}>
         {questions.map((q) => (
           <section
@@ -78,6 +85,7 @@ export default async function AssignmentPage({
             {q.type === "text" ? (
               <div style={{ marginTop: 12 }}>
                 <textarea
+                  name={`q_${q.questionId}`}
                   placeholder="Type your answer here..."
                   rows={4}
                   style={{
@@ -121,6 +129,7 @@ export default async function AssignmentPage({
           </section>
         ))}
       </div>
+      <SubmitAssignmentButton questions={questions} />
     </main>
   );
 }

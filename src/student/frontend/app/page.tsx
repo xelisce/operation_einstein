@@ -22,7 +22,7 @@ async function getDashboardData(): Promise<{
   workshops: Workshop[];
   todoList: Assignment[];
 }> {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL;
   const res = await fetch(`${base}/api/dashboard`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load dashboard data");
   return (await res.json()) as { workshops: Workshop[]; todoList: Assignment[] };

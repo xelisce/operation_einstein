@@ -9,7 +9,7 @@ app.use(express.json());
 
 //dummy api
 app.get("/api/hello", (req, res) => {
-  res.json({ ok: true, message: "Backend is up" });
+  res.json({ ok: true, message: "Hello from the backend!" });
 });
 
 //GET all workshops
@@ -120,6 +120,33 @@ app.get("/api/dashboard", async (req, res) => {
     })),
   });
 });
+
+//GET assignment by assignmentId
+app.get("/api/assignments/:assignmentId", async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const { data, error } = await supabase
+      .from("assignments")
+      .select("*")
+      .eq("assignment_id", assignmentId)
+      .single();
+
+    if (error) return res.status(404).json({ error: "Assignment not found" });
+    if (!data) return res.status(404).json({ error: "Assignment not found" });
+    const assignment = {
+      assignmentId: data.assignment_id,
+      workshopId: data.workshop_id,
+      title: data.title,
+      points: data.points,
+      dueDate: data.due_date,
+      type: data.assignment_type,
+    };
+    return res.json(assignment);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
 //GET all questions for an assignment
 app.get("/api/assignments/:assignmentId/questions", async (req, res) => {

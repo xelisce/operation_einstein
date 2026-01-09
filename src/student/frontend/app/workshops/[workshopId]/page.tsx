@@ -3,10 +3,10 @@ import Link from "next/link";
 import type { Workshop, Assignment } from "../../models/types";
 
 export const dynamic = "force-dynamic";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 async function getWorkshop(workshopId: string): Promise<Workshop | null> {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-  const res = await fetch(`${base}/api/workshops/${workshopId}`, {
+  const res = await fetch(`${API_BASE}/api/workshops/${workshopId}`, {
     cache: "no-store",
   });
 
@@ -17,8 +17,7 @@ async function getWorkshop(workshopId: string): Promise<Workshop | null> {
 }
 
 async function getAssignments(workshopId: string): Promise<Assignment[]> {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-  const res = await fetch(`${base}/api/workshops/${workshopId}/assignments`, {
+  const res = await fetch(`${API_BASE}/api/workshops/${workshopId}/assignments`, {
     cache: "no-store",
   });
 
