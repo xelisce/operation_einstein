@@ -111,12 +111,12 @@ export default function ScanPage() {
       if (res.ok) {
         alert('Response saved successfully!');
         setExtractedText('');
-        // Optional: Move to next question automatically?
       } else {
-        throw new Error('Failed to save');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to save');
       }
-    } catch (error) {
-      alert('Error saving response');
+    } catch (error: any) {
+      alert(`Error saving response: ${error.message}`);
     } finally {
       setSaving(false);
     }
