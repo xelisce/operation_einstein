@@ -12,32 +12,6 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   const [type, setType] = useState('text');
   const [options, setOptions] = useState('');
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('image', file);
-
-    setUploading(true);
-    try {
-      const res = await fetch('http://127.0.0.1:5001/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      setText(data.text.trim());
-    } catch (error) {
-      console.error(error);
-      alert('Failed to scan image');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,23 +52,7 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-white rounded shadow-md max-w-md mx-auto">
-      <div className="border-b pb-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-fill from Image (OCR)</label>
-        <input 
-          type="file" 
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="block w-full text-sm text-gray-500
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-full file:border-0
-            file:text-sm file:font-semibold
-            file:bg-indigo-50 file:text-indigo-700
-            hover:file:bg-indigo-100"
-        />
-        {uploading && <p className="text-xs text-indigo-600 mt-1">Scanning image...</p>}
-      </div>
-
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="text" className="block text-sm font-medium text-gray-700">Question Text</label>
         <input

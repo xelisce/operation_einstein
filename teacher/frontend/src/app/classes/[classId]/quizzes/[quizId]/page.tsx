@@ -54,12 +54,20 @@ export default function QuizDetail() {
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{quizData.title}</h1>
           </div>
-          <button 
-            onClick={handleSimulate}
-            className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition"
-          >
-            ⚡ Simulate Responses
-          </button>
+          <div className="flex gap-3">
+            <Link 
+              href={`/classes/${classId}/quizzes/${quizId}/scan`}
+              className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 transition flex items-center gap-2"
+            >
+              📷 Grade Papers
+            </Link>
+            <button 
+              onClick={handleSimulate}
+              className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition"
+            >
+              ⚡ Simulate Responses
+            </button>
+          </div>
         </div>
       </div>
 

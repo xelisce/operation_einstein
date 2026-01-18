@@ -21,4 +21,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST /api/responses
+router.post('/', async (req, res) => {
+  const { quizId, questionId, studentId, answer } = req.body;
+
+  try {
+    // Upsert: Find existing response for this student+question and update, or create new.
+    const response = await Response.findOneAndUpdate(
+      { quizId, questionId, studentId },
+      { answer },
+      { new: true, upsert: true } // Upsert option
+    );
+    res.status(201).json(response);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 module.exports = router;
