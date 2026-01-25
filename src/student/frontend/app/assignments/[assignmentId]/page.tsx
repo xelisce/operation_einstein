@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Assignment, Question, QuestionOption } from "../../models/types";
+import BackButton from "../../components/BackButton";
 import SubmitAssignmentButton from "./submitAssignmentButton";
 
 export const dynamic = "force-dynamic";
@@ -64,7 +65,8 @@ export default async function AssignmentPage({
 
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800 }}>{assignment.title}</h1>
+      <BackButton href={`/workshops/${assignment.workshopId}`} />
+      <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 16 }}>{assignment.title}</h1>
       <div style={{ marginTop: 24, display: "grid", gap: 16 }}>
         {questions.map((q) => (
           <section
@@ -129,7 +131,7 @@ export default async function AssignmentPage({
           </section>
         ))}
       </div>
-      <SubmitAssignmentButton questions={questions} />
+      <SubmitAssignmentButton questions={questions} workshopId={assignment.workshopId} />
     </main>
   );
 }

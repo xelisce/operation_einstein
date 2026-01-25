@@ -1,7 +1,10 @@
 "use client";
+import { useRouter } from "next/navigation";
 import type { Question } from "../../models/types";
 
-export default function SubmitAssignmentButton({ questions } : { questions: Question[] }) {
+export default function SubmitAssignmentButton({ questions, workshopId } : { questions: Question[]; workshopId: string }) {
+    const router = useRouter();
+
     function handleSubmit() {
         const allAnswered = questions.every((q) => {
             const name = `q_${q.questionId}`;
@@ -18,6 +21,7 @@ export default function SubmitAssignmentButton({ questions } : { questions: Ques
 
         if (allAnswered) {
             alert("Assignment submitted!");
+            router.push(`/workshops/${workshopId}`);
         } else {
             alert("Please answer all questions.");
         }

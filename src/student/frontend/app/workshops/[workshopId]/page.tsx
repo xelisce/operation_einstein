@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import BackButton from "../../components/BackButton";
 import type { Workshop, Assignment } from "../../models/types";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,8 @@ export default async function WorkshopPage({
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold">{workshop.title}</h1>
+      <BackButton href="/" />
+      <h1 className="text-2xl font-bold mt-4">{workshop.title}</h1>
 
       <h2 className="mt-6 text-lg font-semibold">Assignments</h2>
       {assignments.length === 0 ? (
