@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type ResponseType = {
-  _id: string;
-  studentId: string;
-  answer: string;
-  questionId: { text: string };
-  quizId: { title: string };
-  createdAt: string;
+  response_id: string;
+  student_id: string;
+  answer_text: string;
+  question_text: string;
+  quiz_title: string;
+  created_at: string;
 };
 
 type Props = {
-  quizId?: string;
+  quizId?: string; // assignment_id
   refreshTrigger?: number;
 };
 
@@ -21,18 +22,52 @@ const ResponseViewer = ({ quizId, refreshTrigger }: Props) => {
   const [loading, setLoading] = useState(true);
 
   const fetchResponses = async () => {
-    try {
-      let url = 'http://127.0.0.1:5001/api/responses';
-      if (quizId) url += `?quizId=${quizId}`;
-      
-      const res = await fetch(url);
-      const data = await res.json();
-      setResponses(data);
-    } catch (error) {
-      console.error('Failed to fetch responses', error);
-    } finally {
-      setLoading(false);
+    // Correct Query: Fetch responses, join questions, and then nested join assignments from questions
+    // Syntax: *, questions ( question_text, assignments ( title ) )
+    
+    let query = supabase
+      .from('responses')
+      .select(`
+        *,
+        questions (
+          question_text,
+          assignments (
+            title
+          )
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (quizId) {
+      const { data: qData } = await supabase.from('questions').select('question_id').eq('assignment_id', quizId);
+      if (qData && qData.length > 0) {
+        const qIds = qData.map(q => q.question_id);
+        query = query.in('question_id', qIds);
+      } else {
+        setResponses([]);
+        setLoading(false);
+        return;
+      }
     }
+
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching responses:', error);
+    } else {
+      // Map the nested data to a flat structure for the table
+      const formatted = (data || []).map((r: any) => ({
+        response_id: r.response_id,
+        student_id: r.student_id,
+        answer_text: r.answer_text,
+        question_text: r.questions?.question_text || 'Unknown',
+        quiz_title: r.questions?.assignments?.title || 'Unknown',
+        created_at: r.created_at
+      }));
+      setResponses(formatted);
+    }
+    
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -61,7 +96,7 @@ const ResponseViewer = ({ quizId, refreshTrigger }: Props) => {
             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
               <tr>
                 <th className="px-6 py-3">Student ID</th>
-                <th className="px-6 py-3">Quiz</th>
+                {!quizId && <th className="px-6 py-3">Quiz</th>}
                 <th className="px-6 py-3">Question</th>
                 <th className="px-6 py-3">Answer</th>
                 <th className="px-6 py-3">Time</th>
@@ -69,12 +104,12 @@ const ResponseViewer = ({ quizId, refreshTrigger }: Props) => {
             </thead>
             <tbody>
               {responses.map((res) => (
-                <tr key={res._id} className="bg-white border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium text-gray-900">{res.studentId}</td>
-                  <td className="px-6 py-4">{res.quizId?.title || 'Unknown Quiz'}</td>
-                  <td className="px-6 py-4">{res.questionId?.text || 'Unknown Question'}</td>
-                  <td className="px-6 py-4 text-gray-900">{res.answer}</td>
-                  <td className="px-6 py-4">{new Date(res.createdAt).toLocaleString()}</td>
+                <tr key={res.response_id} className="bg-white border-b hover:bg-gray-50">
+                  <td className="px-6 py-4 font-medium text-gray-900">{res.student_id}</td>
+                  {!quizId && <td className="px-6 py-4">{res.quiz_title}</td>}
+                  <td className="px-6 py-4">{res.question_text}</td>
+                  <td className="px-6 py-4 text-gray-900">{res.answer_text}</td>
+                  <td className="px-6 py-4">{new Date(res.created_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

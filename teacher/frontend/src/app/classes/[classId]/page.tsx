@@ -3,96 +3,155 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
-type ClassType = {
-  _id: string;
-  name: string;
-  grade: number;
-  students: { name: string; studentId: string }[];
+type Workshop = {
+  workshop_id: string;
+  title: string;
+  code: string;
 };
 
-type QuizType = {
-  _id: string;
+type Assignment = {
+  assignment_id: string;
   title: string;
-  createdAt: string;
+  created_at: string; // Supabase returns string timestamps
 };
 
 export default function ClassDetail() {
   const params = useParams();
   const classId = params.classId as string;
   
-  const [classData, setClassData] = useState<ClassType | null>(null);
-  const [quizzes, setQuizzes] = useState<QuizType[]>([]);
+  const [classData, setClassData] = useState<Workshop | null>(null);
+  const [quizzes, setQuizzes] = useState<Assignment[]>([]);
+  const [students, setStudents] = useState<any[]>([]); // Enrollments
   const [newQuizTitle, setNewQuizTitle] = useState('');
+  const [newStudentId, setNewStudentId] = useState(''); // For enrolling
+  const [newStudentName, setNewStudentName] = useState(''); // For creating new student
+  const [showNameInput, setShowNameInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'quizzes' | 'students'>('quizzes');
   const [loading, setLoading] = useState(true);
 
   const fetchClass = async () => {
-    try {
-      const res = await fetch(`http://127.0.0.1:5001/api/classes/${classId}`);
-      if (!res.ok) throw new Error('Class not found');
-      const data = await res.json();
-      setClassData(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from('workshops')
+      .select('*')
+      .eq('workshop_id', classId)
+      .single();
+    
+    if (error) console.error(error);
+    else setClassData(data);
+    setLoading(false);
   };
 
   const fetchQuizzes = async () => {
-    try {
-      const res = await fetch(`http://127.0.0.1:5001/api/quizzes?classId=${classId}`);
-      const data = await res.json();
-      setQuizzes(data);
-    } catch (error) {
-      console.error(error);
-    }
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('workshop_id', classId)
+      .eq('assignment_type', 'assignment')
+      .order('title');
+
+    if (error) console.error(error);
+    else setQuizzes(data || []);
+  };
+
+  const fetchStudents = async () => {
+    // Fetch enrollments and join students table to get the name
+    // Syntax: select('*, students(name)') relies on FK being detected
+    const { data, error } = await supabase
+      .from('enrollments')
+      .select('*, students(name)')
+      .eq('workshop_id', classId);
+
+    if (error) console.error(error);
+    else setStudents(data || []);
   };
 
   useEffect(() => {
     if (classId) {
       fetchClass();
       fetchQuizzes();
+      fetchStudents();
     }
   }, [classId]);
+
+  const handleEnrolStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudentId.trim()) return;
+
+    // 1. Check if student exists
+    const { data: student, error: fetchError } = await supabase
+      .from('students')
+      .select('*')
+      .eq('student_id', newStudentId)
+      .single();
+
+    if (!student && !showNameInput) {
+      // Student doesn't exist, ask for name
+      setShowNameInput(true);
+      return;
+    }
+
+    if (showNameInput && !newStudentName.trim()) {
+      alert('Please enter student name');
+      return;
+    }
+
+    // 2. Create student if needed
+    if (showNameInput) {
+      const { error: createError } = await supabase
+        .from('students')
+        .insert([{ student_id: newStudentId, name: newStudentName }]);
+      
+      if (createError) {
+        alert(`Error creating student: ${createError.message}`);
+        return;
+      }
+    }
+
+    // 3. Create Enrollment
+    const { error: enrolError } = await supabase
+      .from('enrollments')
+      .insert([{ workshop_id: classId, student_id: newStudentId }]);
+
+    if (enrolError) {
+      alert(`Error enrolling: ${enrolError.message}`); // Likely duplicate key if already enrolled
+    } else {
+      alert('Student enrolled successfully!');
+      setNewStudentId('');
+      setNewStudentName('');
+      setShowNameInput(false);
+      fetchStudents();
+    }
+  };
 
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuizTitle.trim()) return;
-    try {
-      const res = await fetch('http://127.0.0.1:5001/api/quizzes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newQuizTitle, classId })
-      });
-      if (res.ok) {
-        setNewQuizTitle('');
-        fetchQuizzes();
-      }
-    } catch (error) {
-      alert('Failed to create quiz');
-    }
-  };
 
+    // assignment_id is generated by default (uuid)
+    const { error } = await supabase
+      .from('assignments')
+      .insert([
+        {
+          workshop_id: classId,
+          title: newQuizTitle,
+          assignment_type: 'assignment',
+          points: 100, // Default
+          due_date: new Date().toISOString() // Placeholder date
+        }
+      ]);
 
-  const handleSimulateStudents = async () => {
-    if (!confirm('Generate 20 mock students?')) return;
-    try {
-      await fetch(`http://127.0.0.1:5001/api/classes/${classId}/simulate-students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: 20 })
-      });
-      fetchClass();
-    } catch (e) {
-      alert('Failed to simulate');
+    if (error) {
+      alert(`Failed to create quiz: ${error.message}`);
+    } else {
+      setNewQuizTitle('');
+      fetchQuizzes();
     }
   };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading class details...</div>;
   if (!classData) return <div className="p-8 text-center text-red-500">Class not found.</div>;
-
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -102,30 +161,30 @@ export default function ClassDetail() {
           <Link href="/" className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
             &larr; Back to Dashboard
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">{classData.name}</h1>
-          <p className="text-gray-500">Grade {classData.grade}</p>
+          <h1 className="text-3xl font-bold text-gray-900">{classData.title}</h1>
+          <p className="text-gray-500">{classData.code}</p>
 
           {/* Tabs */}
-          <div className="flex gap-6 mt-6 border-b border-gray-100">
+          <div className="flex gap-4 mt-6 border-b border-gray-200">
             <button
               onClick={() => setActiveTab('quizzes')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 ${
+              className={`pb-3 px-4 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'quizzes' 
-                  ? 'border-indigo-600 text-indigo-600' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              Quizzes & Assessments
+              Assignments (Quizzes)
             </button>
             <button
               onClick={() => setActiveTab('students')}
-              className={`pb-3 px-1 text-sm font-medium transition-colors border-b-2 ${
+              className={`pb-3 px-4 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'students' 
-                  ? 'border-indigo-600 text-indigo-600' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
-              Students
+              Students (Roster)
             </button>
           </div>
         </div>
@@ -160,15 +219,12 @@ export default function ClassDetail() {
               <div className="grid grid-cols-1 gap-4">
                 {quizzes.map((quiz) => (
                   <Link 
-                    key={quiz._id} 
-                    href={`/classes/${classId}/quizzes/${quiz._id}`}
+                    key={quiz.assignment_id} 
+                    href={`/classes/${classId}/quizzes/${quiz.assignment_id}`}
                     className="block border p-4 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition"
                   >
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-lg text-gray-900">{quiz.title}</h3>
-                      <span className="text-sm text-gray-500">
-                        Created: {new Date(quiz.createdAt).toLocaleDateString()}
-                      </span>
                     </div>
                   </Link>
                 ))}
@@ -178,18 +234,40 @@ export default function ClassDetail() {
         )}
 
         {activeTab === 'students' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Class Roster ({classData.students?.length || 0})</h2>
-              <button 
-                onClick={handleSimulateStudents}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm"
-              >
-                + Generate 20 Mock Students
-              </button>
+          <div className="bg-white p-6 rounded-lg shadow-sm border space-y-6">
+            <div className="flex justify-between items-end border-b pb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Class Roster ({students.length})</h2>
+              
+              <form onSubmit={handleEnrolStudent} className="flex gap-2 items-end">
+                <div>
+                  <input
+                    type="text"
+                    value={newStudentId}
+                    onChange={(e) => setNewStudentId(e.target.value)}
+                    placeholder="Student ID"
+                    className="border rounded px-3 py-1 text-sm w-32"
+                    required
+                  />
+                </div>
+                {showNameInput && (
+                  <div>
+                    <input
+                      type="text"
+                      value={newStudentName}
+                      onChange={(e) => setNewStudentName(e.target.value)}
+                      placeholder="Student Name"
+                      className="border rounded px-3 py-1 text-sm w-48"
+                      required
+                    />
+                  </div>
+                )}
+                <button type="submit" className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm">
+                  {showNameInput ? 'Create & Enrol' : 'Enrol'}
+                </button>
+              </form>
             </div>
             
-            {(!classData.students || classData.students.length === 0) ? (
+            {students.length === 0 ? (
               <div className="text-center py-12 text-gray-400 bg-gray-50 rounded border-2 border-dashed">
                 No students enrolled.
               </div>
@@ -199,14 +277,18 @@ export default function ClassDetail() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {classData.students.map((s, idx) => (
-                      <tr key={idx}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{s.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{s.studentId}</td>
+                    {students.map((s) => (
+                      <tr key={s.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {s.students?.name || 'Unknown Name'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {s.student_id}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

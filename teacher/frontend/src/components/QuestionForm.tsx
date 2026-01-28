@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type Props = {
-  quizId?: string;
+  quizId?: string; // assignment_id
   onQuestionCreated?: () => void;
 };
 
@@ -12,56 +13,42 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   const [type, setType] = useState('text');
   const [options, setOptions] = useState('');
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('image', file);
-
-    setUploading(true);
-    try {
-      const res = await fetch('http://127.0.0.1:5001/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      setText(data.text.trim());
-    } catch (error) {
-      console.error(error);
-      alert('Failed to scan image');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!quizId) return;
     setLoading(true);
 
-    const questionData = {
-      text,
-      type,
-      options: type === 'multiple-choice' ? options.split(',').map(o => o.trim()) : [],
-      quizId, // Include quizId
-    };
-
     try {
-      const res = await fetch('http://127.0.0.1:5001/api/questions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(questionData),
-      });
+      // 1. Insert Question
+      const { data: qData, error: qError } = await supabase
+        .from('questions')
+        .insert([
+          {
+            assignment_id: quizId,
+            question_text: text,
+            type: type,
+            question_order: Math.floor(Math.random() * 10000) // Safe integer
+          }
+        ])
+        .select()
+        .single();
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to create question');
+      if (qError) throw qError;
+
+      // 2. Insert Options (if MC)
+      if (type === 'multiple-choice' && options) {
+        const opts = options.split(',').map((o, idx) => ({
+          question_id: qData.question_id,
+          option_text: o.trim(),
+          option_order: idx + 1
+        }));
+
+        const { error: oError } = await supabase
+          .from('questionoptions')
+          .insert(opts);
+          
+        if (oError) throw oError;
       }
 
       alert('Question created successfully!');
@@ -70,31 +57,17 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
       setType('text');
       if (onQuestionCreated) onQuestionCreated();
     } catch (error: any) {
-      console.error(error);
-      alert(`Error: ${error.message}`);
+      console.error('Full Error Object:', error);
+      console.error('Error Details:', error.details);
+      console.error('Error Hint:', error.hint);
+      alert(`Error: ${error.message || JSON.stringify(error)}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-white rounded shadow-md max-w-md mx-auto">
-      <div className="border-b pb-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Auto-fill from Image (OCR)</label>
-        <input 
-          type="file" 
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="block w-full text-sm text-gray-500
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-full file:border-0
-            file:text-sm file:font-semibold
-            file:bg-indigo-50 file:text-indigo-700
-            hover:file:bg-indigo-100"
-        />
-        {uploading && <p className="text-xs text-indigo-600 mt-1">Scanning image...</p>}
-      </div>
-
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="text" className="block text-sm font-medium text-gray-700">Question Text</label>
         <input
@@ -117,7 +90,6 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
         >
           <option value="text">Text</option>
           <option value="multiple-choice">Multiple Choice</option>
-          <option value="scale">Scale</option>
         </select>
       </div>
 

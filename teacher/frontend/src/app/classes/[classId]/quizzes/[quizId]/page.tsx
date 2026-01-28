@@ -6,37 +6,43 @@ import { useParams } from 'next/navigation';
 import QuestionForm from '@/components/QuestionForm';
 import QuestionList from '@/components/QuestionList';
 import ResponseViewer from '@/components/ResponseViewer';
+import { supabase } from '@/lib/supabase';
+
+type QuizType = {
+  assignment_id: string;
+  title: string;
+  created_at: string;
+};
 
 export default function QuizDetail() {
   const params = useParams();
   const classId = params.classId as string;
   const quizId = params.quizId as string;
   
-  const [quizData, setQuizData] = useState<any>(null); // Quick type
+  const [quizData, setQuizData] = useState<QuizType | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchQuiz = async () => {
-      const res = await fetch(`http://127.0.0.1:5001/api/quizzes?classId=${classId}`);
-      const data = await res.json();
-      const quiz = data.find((q: any) => q._id === quizId);
-      setQuizData(quiz);
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('assignment_id', quizId)
+      .single();
+
+    if (error) console.error(error);
+    else setQuizData(data);
   };
 
   useEffect(() => {
     if (quizId) fetchQuiz();
-  }, [quizId, classId]);
+  }, [quizId]);
 
+  /* 
+  // Simulation Logic (Temporarily Disabled - Requires Supabase Edge Function)
   const handleSimulate = async () => {
-    if (!confirm('Simulate 20 students taking this quiz? This will clear existing responses.')) return;
-    try {
-      const res = await fetch(`http://127.0.0.1:5001/api/quizzes/${quizId}/simulate`, { method: 'POST' });
-      const data = await res.json();
-      alert(`Simulation complete! Generated ${data.count} responses.`);
-      setRefreshKey(k => k + 1); // Refresh lists
-    } catch (e) {
-      alert('Simulation failed');
-    }
+    // ...
   };
+  */
 
   if (!quizData) return <div className="p-8 text-center text-gray-500">Loading quiz...</div>;
 
@@ -54,12 +60,22 @@ export default function QuizDetail() {
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{quizData.title}</h1>
           </div>
-          <button 
-            onClick={handleSimulate}
-            className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition"
-          >
-            ⚡ Simulate Responses
-          </button>
+          <div className="flex gap-3">
+            <Link 
+              href={`/classes/${classId}/quizzes/${quizId}/scan`}
+              className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 transition flex items-center gap-2"
+            >
+              📷 Grade Papers
+            </Link>
+            {/* 
+            <button 
+              onClick={handleSimulate}
+              className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 transition"
+            >
+              ⚡ Simulate Responses
+            </button> 
+            */}
+          </div>
         </div>
       </div>
 
