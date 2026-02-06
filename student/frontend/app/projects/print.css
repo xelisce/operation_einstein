@@ -1,0 +1,39 @@
+/* print.css */
+
+@media print {
+  /* Hide anything you don't want */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide ONLY Quill toolbar */
+  .ql-toolbar {
+    display: none !important;
+  }
+
+  /* Keep the editor box visible */
+  .ql-container {
+    border: 1px solid #d1d5db !important; /* similar to tailwind gray-300 */
+  }
+
+  /* Clean up editor spacing for print */
+  .ql-editor {
+    padding: 12px !important;
+    min-height: auto !important;
+  }
+
+  /* Better document spacing */
+  .print-page {
+    padding: 24mm !important;
+  }
+
+  h3 {
+    margin-top: 14mm;
+    margin-bottom: 4mm;
+    page-break-after: avoid;
+  }
+
+  .answer-block {
+    page-break-inside: avoid;
+  }
+}
