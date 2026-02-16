@@ -246,6 +246,65 @@ app.get("/api/projects/:projectId/questions", async (req, res) => {
   }
 });
 
+// POST save/update responses for a project
+app.post("/api/projects/:projectId/responses", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { responses } = req.body;
+
+    if (!Array.isArray(responses)) {
+      return res.status(400).json({ error: "responses must be an array" });
+    }
+
+    const rows = responses.map((r) => ({
+      project_id: projectId,
+      question_id: r.questionId,
+      content_html: r.contentHtml ?? "",
+      content_delta: r.contentDelta ?? null,
+    }));
+
+    const { data, error } = await supabase
+      .from("project_responses")
+      .upsert(rows, { onConflict: "project_id,question_id" })
+      .select("response_id, project_id, question_id");
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    return res.json({ saved: data?.length ?? 0, rows: data ?? [] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET all responses for a project (1 per question)
+app.get("/api/projects/:projectId/responses", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const { data, error } = await supabase
+      .from("project_responses")
+      .select("response_id, project_id, question_id, content_html, content_delta")
+      .eq("project_id", projectId);
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    const responses = (data ?? []).map((r) => ({
+      responseId: r.response_id,
+      projectId: r.project_id,
+      questionId: r.question_id,
+      contentHtml: r.content_html ?? "",
+      contentDelta: r.content_delta ?? null,
+    }));
+
+    return res.json(responses);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 //Start server
 app.listen(process.env.PORT || 4000, () => {
   console.log(`Backend listening on port ${process.env.PORT || 4000}`);

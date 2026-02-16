@@ -5,7 +5,7 @@ import "quill/dist/quill.snow.css";
 
 type Props = {
   value?: string;
-  onChange?: (html: string) => void;
+  onChange?: (payload: { html: string; delta: unknown }) => void;
   placeholder?: string;
   className?: string;
 };
@@ -40,7 +40,8 @@ export default function RichTextEditor({
 
     const handler = () => {
       const html = quill.root.innerHTML;
-      onChange?.(html);
+      const delta = quill.getContents();
+      onChange?.({ html, delta });
     };
 
     quill.on("text-change", handler);

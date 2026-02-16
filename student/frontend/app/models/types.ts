@@ -43,3 +43,11 @@ export type ProjectQuestion = {
   prompt: string;
   position: number;
 };
+
+export type ProjectResponseRow = {
+  response_id: string;
+  project_id: string;
+  question_id: string;
+  content_html: string;
+  content_delta: unknown;
+};
