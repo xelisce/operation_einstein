@@ -4,7 +4,7 @@ import cors from "cors";
 import supabase from "./supabaseClient.js";
 
 const app = express();
-app.use(cors({ origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:3000" })); 
+app.use(cors({ origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:3000" }));
 app.use(express.json());
 
 //dummy api
@@ -68,8 +68,8 @@ app.get("/api/workshops/:workshopId/assignments", async (req, res) => {
         .eq("workshop_id", workshopId)
         .single(),
     ]);
-    if (wErr) return res.status(404).json({ error: "Workshop not found" });
-    if (aErr) return res.status(500).json({ error: aErr.message });
+  if (wErr) return res.status(404).json({ error: "Workshop not found" });
+  if (aErr) return res.status(500).json({ error: aErr.message });
 
   return res.json(
     (assignments ?? []).map((a) => ({
@@ -194,6 +194,53 @@ app.get("/api/questions/:questionId/options", async (req, res) => {
     }));
 
     return res.json(options);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+//GET project by id
+app.get("/api/projects/:projectId", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { data, error } = await supabase
+      .from("projects")
+      .select("project_id, title")
+      .eq("project_id", projectId)
+      .single();
+    if (error) return res.status(404).json({ error: "Project not found" });
+    const project = {
+      projectId: data.project_id,
+      title: data.title,
+    };
+    return res.json(project);
+
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET all questions for a project
+app.get("/api/projects/:projectId/questions", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const { data, error } = await supabase
+      .from("project_questions")
+      .select("question_id, project_id, prompt, position")
+      .eq("project_id", projectId)
+      .order("position", { ascending: true });
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    const questions = (data ?? []).map((q) => ({
+      projectQuestionId: q.question_id,
+      projectId: q.project_id,
+      prompt: q.prompt,
+      position: q.position,
+    }));
+
+    return res.json(questions);
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
   }
