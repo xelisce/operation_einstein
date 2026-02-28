@@ -1,171 +1,190 @@
-// Student Dashboard Page
+'use client';
 
-import React from "react";
-import { 
-  BookOpen, 
-  Calendar, 
-  LayoutDashboard, 
-  MessageSquare, 
-  Bell, 
-  MoreVertical, 
-  FileText, 
-  Megaphone,
-  CheckCircle2,
-  X
-} from "lucide-react";
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 
-import Link from "next/link";
-import type { Workshop, Assignment } from "./models/types";
-export const dynamic = "force-dynamic";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function getDashboardData(): Promise<{
-  workshops: Workshop[];
-  todoList: Assignment[];
-}> {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-  const res = await fetch(`${base}/api/dashboard`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to load dashboard data");
-  return (await res.json()) as { workshops: Workshop[]; todoList: Assignment[] };
-}
+export default function AuthGateway() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  
+  // Auth Form State
+  const [isLogin, setIsLogin] = useState(true);
+  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-export default async function StudentDashboard() {
-  const { workshops, todoList } = await getDashboardData();
+  const TEACHER_APP_URL = process.env.NEXT_PUBLIC_TEACHER_URL;
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'logout') {
+      supabase.auth.signOut().then(() => {
+        window.location.href = '/'; // Reload to wipe the URL clean
+      });
+      return; // Stop the rest of the effect from running
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) routeUser(session.user.id);
+      else setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        routeUser(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const routeUser = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      if (data.role === 'teacher') {
+        window.location.href = `${TEACHER_APP_URL}/`;
+      } else {
+        // Route students to their newly created dashboard page
+        router.push('/dashboard'); 
+      }
+    } catch (err) {
+      console.error("Error fetching role:", err);
+      setLoading(false);
+    }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) throw authError;
+      } else {
+        const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+        if (authError) throw authError;
+        
+        if (authData.user) {
+          await supabase.from('profiles').insert([{ id: authData.user.id, email, role }]);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-emerald-600 font-medium animate-pulse">Loading Operation Einstein...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans">
-      
-      {/* --- LEFT NAVIGATION SIDEBAR --- */}
-      <aside className="w-[84px] bg-[#2D3B45] flex flex-col items-center py-4 fixed h-full z-10 text-white shrink-0">
-        <div className="mb-6">
-            {/* Logo Placeholder */}
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-                <span className="font-bold text-lg">V</span>
-            </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex flex-col items-center justify-center mb-8">
+          <div className="w-16 h-16 bg-emerald-600 text-white rounded-full flex items-center justify-center text-3xl font-bold mb-4">
+            V
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Operation Einstein</h1>
+          <p className="text-gray-500 text-sm mt-1">Science Workshop Portal</p>
         </div>
-        
-        <nav className="flex flex-col gap-6 w-full">
-          <NavItem icon={<LayoutDashboard size={24} />} label="Dashboard" active />
-          <NavItem icon={<BookOpen size={24} />} label="Courses" />
-          <NavItem icon={<Calendar size={24} />} label="Calendar" />
-          <NavItem icon={<MessageSquare size={24} />} label="Inbox" />
-        </nav>
-      </aside>
 
-      {/* --- MAIN CONTENT AREA --- */}
-      <div className="flex-1 ml-[84px] flex flex-col md:flex-row">
-        
-        {/* CENTER DASHBOARD */}
-        <main className="flex-1 p-8">
-          <header className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-normal text-gray-800">Dashboard</h1>
-            <button className="p-2 hover:bg-gray-200 rounded-full">
-               <MoreVertical className="text-gray-500" />
-            </button>
-          </header>
+        <h2 className="text-lg font-semibold mb-6 text-center text-gray-800">
+          {isLogin ? 'Welcome Back!' : 'Create your Account'}
+        </h2>
 
-          {/* Course Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-            {workshops.map((course) => (
-              <div 
-                key={course.workshopId} 
-                className="group flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-64"
-              >
-                {/* Colored Header */}
-                <div className={`${course.color} h-36 relative p-4`}>
-                    <button className="absolute top-2 right-2 text-white/80 hover:text-white">
-                        <MoreVertical size={20} />
-                    </button>
-                </div>
-
-                {/* Card Content */}
-                <div className="p-4 flex flex-col justify-between flex-1">
-                  <div>
-                    <h2 className="text-emerald-700 font-bold text-lg leading-tight">
-                      <Link href={`/workshops/${course.workshopId}`} className="hover:underline">
-                        {course.title}
-                      </Link>
-                    </h2> 
-                    <p className="text-gray-500 text-sm mt-1">
-                        {course.code} • {course.term}
-                    </p>
-                  </div>
-
-                  {/* Action Icons (Assignments, Announcements, etc.) */}
-                  <div className="flex gap-4 mt-4 text-gray-400">
-                    <Megaphone size={18} className="hover:text-emerald-600 transition-colors" />
-                    <FileText size={18} className="hover:text-emerald-600 transition-colors" /> 
-                    <MessageSquare size={18} className="hover:text-emerald-600 transition-colors" />
-                    <div className="flex-1" /> {/* Spacer */}
-                  </div>
-                </div>
-              </div>
-            ))}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4 text-center">
+            {error}
           </div>
-        </main>
+        )}
 
-        {/* --- RIGHT SIDEBAR (TO DO LIST / ASSIGNMENTS) --- */}
-        <aside className="w-full md:w-80 bg-white border-l border-gray-200 p-6 shrink-0 hidden md:block">
-          <div className="mb-6">
-            <h3 className="text-gray-500 font-bold uppercase text-xs tracking-wider mb-4">To Do</h3>
-            <div className="flex flex-col gap-4">
-              {todoList.map((item) => (
-                <div key={item.assignmentId} className="flex gap-3 group cursor-pointer">
-                  <div className="mt-1 text-gray-400 group-hover:text-emerald-600">
-                    <AssignmentIcon type={item.type} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                        <h4 className="text-sm font-bold text-gray-700 group-hover:underline leading-tight">
-                            {item.title}
-                        </h4>
-                        <button className="text-gray-300 hover:text-gray-500">
-                            <X size={14} />
-                        </button>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                        {item.workshop}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                        {item.points > 0 ? `${item.points} points • ` : ''} {item.dueDate}
-                    </p>
-                  </div>
-                </div>
-              ))}
+        <form onSubmit={handleAuth} className="space-y-5">
+          {!isLogin && (
+            <div className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
+                <input 
+                  type="radio" 
+                  checked={role === 'student'} 
+                  onChange={() => setRole('student')} 
+                  className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                />
+                Student
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
+                <input 
+                  type="radio" 
+                  checked={role === 'teacher'} 
+                  onChange={() => setRole('teacher')}
+                  className="text-emerald-600 focus:ring-emerald-500 w-4 h-4" 
+                />
+                Teacher
+              </label>
             </div>
-            
-            <button className="text-sm text-emerald-700 font-medium mt-6 hover:underline">
-                Show All
-            </button>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <input
+              type="email"
+              required
+              className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm outline-none"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-gray-500 font-bold uppercase text-xs tracking-wider mb-4 flex justify-between">
-                Recent Feedback
-            </h3>
-             <div className="flex gap-3 text-sm text-gray-500 items-center">
-                 <CheckCircle2 size={16} className="text-green-600" />
-                 <span>Nothing for now</span>
-             </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input
+              type="password"
+              required
+              className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm outline-none"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
-        </aside>
 
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-emerald-600 text-white rounded-lg py-2.5 px-4 hover:bg-emerald-700 transition-colors font-semibold shadow-sm disabled:opacity-70"
+          >
+            {loading ? 'Processing...' : (isLogin ? 'Log In' : 'Sign Up')}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => { setIsLogin(!isLogin); setError(''); }}
+            className="text-sm text-emerald-600 hover:text-emerald-800 font-medium"
+          >
+            {isLogin ? "Need an account? Sign up" : "Already have an account? Log in"}
+          </button>
+        </div>
       </div>
     </div>
   );
-}
-
-// --- Helper Components ---
-
-function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
-  return (
-    <div className={`flex flex-col items-center gap-1 cursor-pointer w-full py-2 border-l-4 transition-colors ${active ? 'border-white text-white' : 'border-transparent text-gray-400 hover:text-white'}`}>
-      {icon}
-      <span className="text-[10px] font-medium tracking-wide">{label}</span>
-    </div>
-  );
-}
-
-function AssignmentIcon({ type }: { type: string }) {
-    if (type === 'announcement') return <Megaphone size={18} />;
-    return <FileText size={18} />;
 }
