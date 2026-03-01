@@ -199,6 +199,25 @@ app.get("/api/questions/:questionId/options", async (req, res) => {
   }
 });
 
+//GET all projects for a workshop
+app.get("/api/workshops/:workshopId/projects", async (req, res) => {
+  try {
+    const { workshopId } = req.params;
+    const { data, error } = await supabase
+      .from("projects")
+      .select("project_id, title")
+      .eq("workshop_id", workshopId)
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    return res.json(
+      (data ?? []).map((p) => ({ projectId: p.project_id, title: p.title }))
+    );
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 //GET project by id
 app.get("/api/projects/:projectId", async (req, res) => {
   try {
