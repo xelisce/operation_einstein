@@ -164,6 +164,16 @@ export default function ClassDetail() {
           <h1 className="text-3xl font-bold text-gray-900">{classData.title}</h1>
           <p className="text-gray-500">{classData.code}</p>
 
+          {/* analytics link */}
+          <div className="mt-4">
+            <Link
+              href={`/classes/${classId}/analytics`}
+              className="inline-block bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700 text-sm"
+            >
+              View Analytics
+            </Link>
+          </div>
+
           {/* Tabs */}
           <div className="flex gap-4 mt-6 border-b border-gray-200">
             <button
