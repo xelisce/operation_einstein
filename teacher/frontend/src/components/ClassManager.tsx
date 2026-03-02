@@ -33,18 +33,11 @@ const ClassManager = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Generate a random ID or let Supabase do it? 
-    // Schema says "text not null" for workshop_id, implies manual or generated text ID. 
-    // Friend's schema doesn't have default gen_random_uuid() for workshop_id.
-    // I will generate a simple random string or timestamp for now.
-    const newId = `ws-${Date.now()}`; 
 
     const { error } = await supabase
       .from('workshops')
       .insert([
         { 
-          workshop_id: newId,
           title: name,
           code: grade, // Mapping "Grade" input to "Code" column
           color: 'blue', // Required by schema
@@ -74,7 +67,7 @@ const ClassManager = () => {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-gray-500 text-gray-900"
               required
               placeholder="e.g. Science Grade 5"
             />
@@ -85,7 +78,7 @@ const ClassManager = () => {
               type="text"
               value={grade}
               onChange={(e) => setGrade(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="mt-1 block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-gray-500 text-gray-900"
               placeholder="SCI-05"
             />
           </div>

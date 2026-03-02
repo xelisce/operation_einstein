@@ -75,7 +75,7 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 text-gray-900"
           required
         />
       </div>
@@ -86,7 +86,7 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
           id="type"
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 text-gray-900"
         >
           <option value="text">Text</option>
           <option value="multiple-choice">Multiple Choice</option>
@@ -101,7 +101,7 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
             type="text"
             value={options}
             onChange={(e) => setOptions(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 placeholder:text-gray-500 text-gray-900"
             placeholder="Option 1, Option 2, Option 3"
           />
         </div>

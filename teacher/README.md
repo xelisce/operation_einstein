@@ -1,190 +1,132 @@
-# Operation Einstein: Technical Architecture & Developer Guide
+# Operation Einstein: Teacher Interface (Technical Reference)
 
 ## 1. Executive Summary
 
-**Operation Einstein** is a scalable Learning Management System (LMS) engineered for resource-constrained educational environments. This document serves as the comprehensive technical reference for the **Teacher Interface**, a full-stack application designed to facilitate digital assessment management, classroom organization, and performance tracking.
+**Operation Einstein** is a modern Learning Management System (LMS) designed for resource-constrained environments. The Teacher Interface enables educators to manage classrooms, digitize physical assessments via OCR, and track student performance.
 
-The system is built on a **Modular Monolith** architecture using the **MERN Stack** (MongoDB, Express, React/Next.js, Node.js), prioritizing maintainability, type safety (via Mongoose/TypeScript), and rapid deployment via Docker.
+The system has been architected as a **Serverless Application** using **Next.js 14** and **Supabase (PostgreSQL)**, ensuring scalability, real-time data capabilities, and minimal operational overhead.
 
 ---
 
-## 2. System Architecture
+## 2. Technical Stack
 
-### 2.1 High-Level Design
-The application operates as two distinct services (Frontend and Backend) communicating via a RESTful API over HTTP.
+*   **Frontend Framework:** Next.js 14 (App Router, React Server Components).
+*   **Styling:** Tailwind CSS.
+*   **Database & Auth:** Supabase (PostgreSQL).
+*   **Image Processing:**
+    *   **Cropping:** `react-image-crop` (Client-side Canvas).
+    *   **OCR:** `tesseract.js` (Client-side WASM).
+*   **Language:** TypeScript.
+
+---
+
+## 3. System Architecture
+
+The application operates as a single Next.js monolith communicating directly with the Supabase Cloud Database.
 
 ```mermaid
 graph TD
-    User[Teacher] -->|HTTPS/Browser| CDN[Next.js Frontend (Port 3000)]
+    Teacher[Teacher Browser] -->|HTTPS| NextJS[Next.js App (Vercel/Local)]
     
-    subgraph "Client Layer (Next.js)"
-        CDN -->|SSR/CSR| Pages[App Router Pages]
-        Pages -->|Fetch API| API_Client[API Integration Layer]
+    subgraph "Client Side Logic"
+        NextJS -->|WASM| Tesseract[Tesseract OCR Engine]
+        NextJS -->|Canvas API| Cropper[Image Cropper]
     end
 
-    API_Client -->|JSON/HTTP| Gateway[Express API Gateway (Port 5001)]
-
-    subgraph "Server Layer (Node.js)"
-        Gateway -->|Middleware| CORS[CORS / Body Parser]
-        CORS -->|Routing| Router[Express Router]
-        
-        Router -->|Controller| ClassCtrl[Class Controller]
-        Router -->|Controller| QuizCtrl[Quiz Controller]
-        Router -->|Controller| OCRCtrl[OCR Controller]
-        
-        OCRCtrl -->|Buffer| Tesseract[Tesseract.js WASM Engine]
-    end
-    
-    subgraph "Persistence Layer"
-        ClassCtrl -->|Mongoose| ODM[Object Document Mapper]
-        QuizCtrl -->|Mongoose| ODM
-        ODM -->|TCP/IP| DB[(MongoDB Docker Container)]
+    subgraph "Cloud Infrastructure"
+        NextJS -->|Supabase JS Client| Postgres[(Supabase Database)]
     end
 ```
 
-### 2.2 Key Architectural Decisions
-*   **Split Repos Pattern (Monorepo):** Both frontend and backend reside in `teacher/`, but manage dependencies independently (`teacher/package.json` vs `teacher/frontend/package.json`). This allows for independent scaling and deployment pipelines.
-*   **Stateless REST API:** The backend is fully stateless. Authentication (future scope) and state are managed via tokens/IDs, making the backend horizontally scalable.
-*   **Server-Side Rendering (SSR) + Client Hydration:** Next.js App Router is utilized. Pages are Server Components by default (SEO/Performance), using Client Components (`'use client'`) only for interactive islands (Forms, Lists).
+### 3.1 Data Schema (PostgreSQL)
+
+The database relies on normalized tables with Foreign Key relationships.
+
+| Table | Primary Key | Foreign Keys | Description |
+| :--- | :--- | :--- | :--- |
+| **`workshops`** | `workshop_id` (uuid) | - | Equivalent to "Classes". Stores title, code. |
+| **`profiles`** | `id` (uuid) | `id` -> `auth.users` | Global registry of users/students (ID, Name, Role). |
+| **`enrollments`** | `id` (uuid) | `workshop_id`, `student_id` | Many-to-Many link between Workshops and Profiles. |
+| **`assignments`** | `assignment_id` (uuid) | `workshop_id` | Equivalent to "Quizzes". |
+| **`questions`** | `question_id` (uuid) | `assignment_id` | The questions in a quiz. |
+| **`responses`** | `response_id` (uuid) | `question_id`, `student_id` | Student answers. |
 
 ---
 
-## 3. Directory Structure & Codebase Map
+## 4. Feature Implementation Details
 
-### 3.1 Backend (`teacher/`)
-The backend is a Node.js/Express application structured around **Resources** (Classes, Quizzes).
+### 4.1 "Scan & Grade" (OCR Workflow)
+This feature allows teachers to grade handwritten papers digitally.
 
-*   **`server.js`**: Application entry point. Bootstraps MongoDB connection and binds the HTTP server to Port 5001. Handles graceful shutdowns.
-*   **`app.js`**: Express App Factory. Configures global middleware (CORS, JSON Parser, Request Logging) and mounts Route Controllers.
-*   **`models/` (Data Layer)**:
-    *   `Class.js`: Aggregate root for Students.
-    *   `Quiz.js`: Entity linking Class to Questions.
-    *   `Question.js`: Atomic assessment unit.
-    *   `Response.js`: Transactional record of student activity.
-*   **`routes/` (Controller Layer)**:
-    *   `classes.js`: Handles `/api/classes` (CRUD + Student Roster mutation).
-    *   `quizzes.js`: Handles `/api/quizzes` (CRUD + Simulation logic).
-    *   `upload.js`: Handles `/api/upload` (Multipart/form-data processing).
-*   **`services/` (Business Logic)**:
-    *   `ocrService.js`: Pure function module that wraps the Tesseract.js worker lifecycle (Initialize -> Recognize -> Terminate).
+1.  **Upload:** Teacher selects a photo of a student's worksheet.
+2.  **Crop:** Using `react-image-crop`, the teacher draws a box around the specific answer.
+3.  **Process (Client-Side):**
+    *   The browser extracts the pixel data from the cropped region using HTML5 Canvas.
+    *   The data is passed to `Tesseract.js` running in a WebWorker.
+    *   Tesseract returns the raw text string.
+4.  **Save:** The teacher verifies the text and clicks "Save". The app inserts a row into the `responses` table via Supabase.
 
-### 3.2 Frontend (`teacher/frontend/`)
-The frontend is a Next.js 14 application using the **App Router**.
-
-*   **`src/app/` (Routing Layer)**:
-    *   `page.tsx`: **Home Route**. Renders the Class Dashboard.
-    *   `classes/[classId]/page.tsx`: **Dynamic Route**. Fetches Class data and renders the Class Detail View (Tabs: Quizzes/Students).
-    *   `classes/[classId]/quizzes/[quizId]/page.tsx`: **Dynamic Route**. Fetches Quiz data and renders the Workstation (Question Form + Response Viewer).
-*   **`src/components/` (UI Library)**:
-    *   `ClassManager.tsx`: Interactive grid for Class management.
-    *   `QuestionForm.tsx`: Complex form handling text input, select dropdowns, and **File Uploads** for OCR.
-    *   `ResponseViewer.tsx`: Data grid component for visualizing student performance.
+### 4.2 Class Management
+*   **Dashboard:** Fetches all `workshops`.
+*   **Roster:** The "Students" tab in a class fetches `enrollments` joined with `profiles` to show names and IDs.
+*   **Enrolment:** Teachers can enrol existing students by providing their UUID (from the `profiles` table).
 
 ---
 
-## 4. Data Dictionary (Schema Reference)
+## 5. Developer Guide
 
-### 4.1 Class Object
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `name` | String | Yes | E.g., "Mathematics 101" |
-| `grade` | Number | No | Grade level (e.g., 5) |
-| `students` | Array | No | Array of Student Objects `{ name, studentId }` |
-| `createdAt` | Date | Yes | Auto-generated timestamp |
+### 5.1 Prerequisites
+*   **Node.js** (v18+)
+*   **Supabase Account:** You need a project URL and Anon Key.
 
-### 4.2 Quiz Object
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `title` | String | Yes | E.g., "Midterm Exam" |
-| `description`| String | No | Optional context |
-| `classId` | ObjectId | Yes | Reference to Parent Class |
+### 5.2 Installation
 
-### 4.3 Question Object
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `text` | String | Yes | The question content |
-| `type` | Enum | Yes | `['text', 'multiple-choice', 'scale']` |
-| `options` | Array | Conditional | Required if type is `multiple-choice` |
-| `quizId` | ObjectId | Yes | Reference to Parent Quiz |
-
-### 4.4 Response Object
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `quizId` | ObjectId | Yes | Reference to Quiz |
-| `questionId` | ObjectId | Yes | Reference to Question |
-| `studentId` | String | Yes | The ID of the student who answered |
-| `answer` | String | Yes | The actual response text |
-
----
-
-## 5. API Reference (Internal)
-
-Base URL: `http://localhost:5001`
-
-### 5.1 OCR Service
-*   **Endpoint:** `POST /api/upload`
-*   **Content-Type:** `multipart/form-data`
-*   **Body:** Key: `image`, Value: `[File]`
-*   **Process:**
-    1.  Middleware `multer` intercepts request, streams file to `./uploads`.
-    2.  Controller passes file path to `ocrService`.
-    3.  `ocrService` spins up Tesseract worker, processes image, returns text.
-    4.  Controller cleans up (deletes) temp file.
-    5.  Returns JSON `{ text: "..." }`.
-
-### 5.2 Simulation Engine
-*   **Endpoint:** `POST /api/quizzes/:id/simulate`
-*   **Process:**
-    1.  Fetches `Class` (via Quiz) to get full Student Roster.
-    2.  Fetches all `Questions` for the Quiz.
-    3.  Iterates `Students` × `Questions`.
-    4.  Generates randomized valid answers (e.g., picks a random Option from `question.options`).
-    5.  Performs bulk insert (`Response.insertMany`) for performance.
-
----
-
-## 6. Operational Guide
-
-### 6.1 Environment Setup
-1.  **Docker (MongoDB):**
-    The system requires a MongoDB instance. Run via Docker:
+1.  **Clone & Install:**
     ```bash
-    docker run -d -p 27017:27017 --name mongo-einstein mongo:latest
+    cd teacher/frontend
+    npm install
     ```
-2.  **Node Environment:**
-    Ensure Node.js v18+ is installed (`node -v`).
 
-### 6.2 Installation & Startup
+2.  **Environment Configuration:**
+    Create a file named `.env.local` in `teacher/frontend/`:
+    ```env
+    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
+    ```
 
-**Backend Service:**
-```bash
-cd teacher
-npm install
-# Starts server on Port 5001
-node backend/server.js
+3.  **Run Development Server:**
+    ```bash
+    npm run dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000).
+
+### 5.3 Database Setup (SQL)
+Run these commands in the Supabase SQL Editor if tables are missing:
+
+```sql
+-- Ensure responses table exists
+create table public.responses (
+  response_id uuid not null default gen_random_uuid (),
+  question_id uuid not null references questions(question_id),
+  student_id text not null,
+  answer_text text not null,
+  created_at timestamp with time zone default now(),
+  constraint responses_pkey primary key (response_id)
+);
 ```
 
-**Frontend Service:**
-```bash
-cd teacher/frontend
-npm install
-# Starts Dev Server on Port 3000 with Hot Reload
-npm run dev
-```
+---
 
-### 6.3 Test Protocols
-The project strictly adheres to **Test-Driven Development (TDD)**. Tests are co-located in `tests/` folders.
+## 6. Directory Structure
 
-**Backend Integration Tests (Jest + Supertest):**
-These tests spin up an **In-Memory MongoDB Server** (`mongodb-memory-server`) to ensure isolation. They do NOT touch the real database.
-```bash
-cd teacher
-npm test
-```
-
-**Frontend Component Tests (Jest + React Testing Library):**
-These tests render components in a virtual DOM and assert on accessibility roles and text content.
-```bash
-cd teacher/frontend
-npm test
-```
+*   `src/app/`: Next.js Pages (Routes).
+    *   `page.tsx`: Dashboard.
+    *   `classes/[classId]/`: Class Detail (Quizzes/Students tabs).
+    *   `classes/[classId]/quizzes/[quizId]/`: Quiz Detail (Question Creator).
+    *   `classes/[classId]/quizzes/[quizId]/scan/`: **Scanner Interface**.
+*   `src/components/`: Reusable UI.
+    *   `ClassManager`: Workshop list/create.
+    *   `QuestionForm`: Quiz question creator.
+    *   `ResponseViewer`: Grading table.
+*   `src/lib/`:
+    *   `supabase.ts`: Initialized Supabase client.
