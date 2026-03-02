@@ -34,6 +34,7 @@ export type QuestionOption = {
 
 export type Project = {
   projectId: string;
+  workshopId: string;
   title: string;
 };
 
