@@ -33,7 +33,6 @@ export default function SubmitAssignmentButton({ questions, workshopId, assignme
             return;
         }
 
-        // Collect responses from form
         const responses = questions.map((q) => {
             const name = `q_${q.questionId}`;
             let answerText = "";
