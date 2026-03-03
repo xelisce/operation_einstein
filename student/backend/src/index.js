@@ -216,6 +216,33 @@ app.get("/api/questions/:questionId/options", async (req, res) => {
   }
 });
 
+//POST save/update responses for an assignment per student
+app.post('/api/assignments/:assignmentId/responses', async (req, res) => {
+  const { assignmentId } = req.params;
+  const { studentId, responses } = req.body;
+
+  if (!studentId || !responses) {
+    return res.status(400).json({ error: "Student ID and responses are required." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('responses')
+      .insert(responses.map(response => ({
+        question_id: response.questionId,
+        student_id: studentId,
+        answer_text: response.answerText,
+      })));
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ message: 'Responses updated successfully', data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 //GET all projects for a workshop
 app.get("/api/workshops/:workshopId/projects", async (req, res) => {
   try {

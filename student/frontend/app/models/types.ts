@@ -1,3 +1,5 @@
+import { Timestamp } from "next/dist/server/lib/cache-handlers/types";
+
 export type Workshop = {
   workshopId: string;
   title: string;
@@ -31,6 +33,14 @@ export type QuestionOption = {
   optionOrder: number;
   optionText: string;
 };
+
+export type QuestionResponse = {
+  responseId: string;
+  questionId: string;
+  studentId: string;
+  answerText: string | null;
+  createdAt: string;
+}
 
 export type Project = {
   projectId: string;
