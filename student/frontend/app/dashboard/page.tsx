@@ -1,14 +1,14 @@
 // Student Dashboard Page
-
+"use client";
 import React from "react";
-import { 
-  BookOpen, 
-  Calendar, 
-  LayoutDashboard, 
-  MessageSquare, 
-  Bell, 
-  MoreVertical, 
-  FileText, 
+import {
+  BookOpen,
+  Calendar,
+  LayoutDashboard,
+  MessageSquare,
+  Bell,
+  MoreVertical,
+  FileText,
   Megaphone,
   CheckCircle2,
   X
@@ -17,33 +17,52 @@ import {
 import Link from "next/link";
 import type { Workshop, Assignment } from "../models/types";
 import LogoutButton from "../components/LogoutButton";
+import { useEffect, useState } from "react";
+import { useAuth } from "../useAuth";
 export const dynamic = "force-dynamic";
 
-async function getDashboardData(): Promise<{
-  workshops: Workshop[];
-  todoList: Assignment[];
-}> {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-  const res = await fetch(`${base}/api/dashboard`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to load dashboard data");
-  return (await res.json()) as { workshops: Workshop[]; todoList: Assignment[] };
-}
+export default function StudentDashboard() {
+  const { user, loading: authLoading } = useAuth();
+  const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  const [todoList, setTodoList] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function StudentDashboard() {
-  const { workshops, todoList } = await getDashboardData();
+  useEffect(() => {
+    if (!user) return;
+
+    async function load() {
+      const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+      const res = await fetch(`${base}/api/dashboard?studentId=${user!.id}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setWorkshops(data.workshops);
+      setTodoList(data.todoList);
+      setLoading(false);
+    }
+
+    load();
+  }, [user]);
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-emerald-600 font-medium animate-pulse">Loading Dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans">
-      
+
       {/* --- LEFT NAVIGATION SIDEBAR --- */}
       <aside className="w-[84px] bg-[#2D3B45] flex flex-col items-center py-4 fixed h-full z-10 text-white shrink-0">
         <div className="mb-6">
-            {/* Logo Placeholder */}
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-                <span className="font-bold text-lg">V</span>
-            </div>
+          {/* Logo Placeholder */}
+          <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <span className="font-bold text-lg">V</span>
+          </div>
         </div>
-        
+
         <nav className="flex flex-col gap-6 w-full flex-1">
           <NavItem icon={<LayoutDashboard size={24} />} label="Dashboard" active />
           <NavItem icon={<BookOpen size={24} />} label="Courses" />
@@ -56,28 +75,28 @@ export default async function StudentDashboard() {
 
       {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 ml-[84px] flex flex-col md:flex-row">
-        
+
         {/* CENTER DASHBOARD */}
         <main className="flex-1 p-8">
           <header className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-normal text-gray-800">Dashboard</h1>
             <button className="p-2 hover:bg-gray-200 rounded-full">
-               <MoreVertical className="text-gray-500" />
+              <MoreVertical className="text-gray-500" />
             </button>
           </header>
 
           {/* Course Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
             {workshops.map((course) => (
-              <div 
-                key={course.workshopId} 
+              <div
+                key={course.workshopId}
                 className="group flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-64"
               >
                 {/* Colored Header */}
                 <div className={`${course.color} h-36 relative p-4`}>
-                    <button className="absolute top-2 right-2 text-white/80 hover:text-white">
-                        <MoreVertical size={20} />
-                    </button>
+                  <button className="absolute top-2 right-2 text-white/80 hover:text-white">
+                    <MoreVertical size={20} />
+                  </button>
                 </div>
 
                 {/* Card Content */}
@@ -87,16 +106,16 @@ export default async function StudentDashboard() {
                       <Link href={`/workshops/${course.workshopId}`} className="hover:underline">
                         {course.title}
                       </Link>
-                    </h2> 
+                    </h2>
                     <p className="text-gray-500 text-sm mt-1">
-                        {course.code} • {course.term}
+                      {course.code} • {course.term}
                     </p>
                   </div>
 
                   {/* Action Icons (Assignments, Announcements, etc.) */}
                   <div className="flex gap-4 mt-4 text-gray-400">
                     <Megaphone size={18} className="hover:text-emerald-600 transition-colors" />
-                    <FileText size={18} className="hover:text-emerald-600 transition-colors" /> 
+                    <FileText size={18} className="hover:text-emerald-600 transition-colors" />
                     <MessageSquare size={18} className="hover:text-emerald-600 transition-colors" />
                     <div className="flex-1" /> {/* Spacer */}
                   </div>
@@ -118,37 +137,37 @@ export default async function StudentDashboard() {
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
-                        <h4 className="text-sm font-bold text-gray-700 group-hover:underline leading-tight">
-                            {item.title}
-                        </h4>
-                        <button className="text-gray-300 hover:text-gray-500">
-                            <X size={14} />
-                        </button>
+                      <h4 className="text-sm font-bold text-gray-700 group-hover:underline leading-tight">
+                        {item.title}
+                      </h4>
+                      <button className="text-gray-300 hover:text-gray-500">
+                        <X size={14} />
+                      </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                        {item.workshop}
+                      {item.workshop}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                        {item.points > 0 ? `${item.points} points • ` : ''} {item.dueDate}
+                      {item.points > 0 ? `${item.points} points • ` : ''} {item.dueDate}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
-            
+
             <button className="text-sm text-emerald-700 font-medium mt-6 hover:underline">
-                Show All
+              Show All
             </button>
           </div>
 
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-gray-500 font-bold uppercase text-xs tracking-wider mb-4 flex justify-between">
-                Recent Feedback
+              Recent Feedback
             </h3>
-             <div className="flex gap-3 text-sm text-gray-500 items-center">
-                 <CheckCircle2 size={16} className="text-green-600" />
-                 <span>Nothing for now</span>
-             </div>
+            <div className="flex gap-3 text-sm text-gray-500 items-center">
+              <CheckCircle2 size={16} className="text-green-600" />
+              <span>Nothing for now</span>
+            </div>
           </div>
         </aside>
 
@@ -169,6 +188,6 @@ function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label
 }
 
 function AssignmentIcon({ type }: { type: string }) {
-    if (type === 'announcement') return <Megaphone size={18} />;
-    return <FileText size={18} />;
+  if (type === 'announcement') return <Megaphone size={18} />;
+  return <FileText size={18} />;
 }
