@@ -56,11 +56,10 @@ export default function ClassDetail() {
   };
 
   const fetchStudents = async () => {
-    // Fetch enrollments and join students table to get the name
-    // Syntax: select('*, students(name)') relies on FK being detected
+    // Fetch enrollments and join profiles table to get the name
     const { data, error } = await supabase
       .from('enrollments')
-      .select('*, students(name)')
+      .select('*, profiles(name)')
       .eq('workshop_id', classId);
 
     if (error) console.error(error);
@@ -79,37 +78,19 @@ export default function ClassDetail() {
     e.preventDefault();
     if (!newStudentId.trim()) return;
 
-    // 1. Check if student exists
+    // 1. Check if student exists in profiles
     const { data: student, error: fetchError } = await supabase
-      .from('students')
+      .from('profiles')
       .select('*')
-      .eq('student_id', newStudentId)
+      .eq('id', newStudentId)
       .single();
 
-    if (!student && !showNameInput) {
-      // Student doesn't exist, ask for name
-      setShowNameInput(true);
+    if (!student) {
+      alert('Student not found. Ensure the student has registered an account and provide their valid User UUID.');
       return;
     }
 
-    if (showNameInput && !newStudentName.trim()) {
-      alert('Please enter student name');
-      return;
-    }
-
-    // 2. Create student if needed
-    if (showNameInput) {
-      const { error: createError } = await supabase
-        .from('students')
-        .insert([{ student_id: newStudentId, name: newStudentName }]);
-      
-      if (createError) {
-        alert(`Error creating student: ${createError.message}`);
-        return;
-      }
-    }
-
-    // 3. Create Enrollment
+    // 2. Create Enrollment
     const { error: enrolError } = await supabase
       .from('enrollments')
       .insert([{ workshop_id: classId, student_id: newStudentId }]);
@@ -119,8 +100,6 @@ export default function ClassDetail() {
     } else {
       alert('Student enrolled successfully!');
       setNewStudentId('');
-      setNewStudentName('');
-      setShowNameInput(false);
       fetchStudents();
     }
   };
@@ -202,7 +181,7 @@ export default function ClassDetail() {
                   value={newQuizTitle}
                   onChange={(e) => setNewQuizTitle(e.target.value)}
                   placeholder="New Quiz Title"
-                  className="border rounded px-3 py-1 text-sm w-64"
+                  className="border rounded px-3 py-1 text-sm w-64 placeholder:text-gray-500 text-gray-900"
                   required
                 />
                 <button type="submit" className="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700 text-sm">
@@ -244,25 +223,13 @@ export default function ClassDetail() {
                     type="text"
                     value={newStudentId}
                     onChange={(e) => setNewStudentId(e.target.value)}
-                    placeholder="Student ID"
-                    className="border rounded px-3 py-1 text-sm w-32"
+                    placeholder="Student UUID"
+                    className="border rounded px-3 py-1 text-sm w-64 placeholder:text-gray-500 text-gray-900"
                     required
                   />
                 </div>
-                {showNameInput && (
-                  <div>
-                    <input
-                      type="text"
-                      value={newStudentName}
-                      onChange={(e) => setNewStudentName(e.target.value)}
-                      placeholder="Student Name"
-                      className="border rounded px-3 py-1 text-sm w-48"
-                      required
-                    />
-                  </div>
-                )}
                 <button type="submit" className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm">
-                  {showNameInput ? 'Create & Enrol' : 'Enrol'}
+                  Enrol
                 </button>
               </form>
             </div>
@@ -277,14 +244,14 @@ export default function ClassDetail() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID (UUID)</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {students.map((s) => (
                       <tr key={s.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {s.students?.name || 'Unknown Name'}
+                          {s.profiles?.name || 'Unknown Name'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {s.student_id}

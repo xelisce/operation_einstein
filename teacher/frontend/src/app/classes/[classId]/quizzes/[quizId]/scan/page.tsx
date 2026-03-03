@@ -174,7 +174,7 @@ export default function ScanPage() {
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 placeholder="Enter Student ID"
-                className="w-full border rounded-md p-2"
+                className="w-full border rounded-md p-2 placeholder:text-gray-500 text-gray-900"
               />
             </div>
 
@@ -183,7 +183,7 @@ export default function ScanPage() {
               <select 
                 value={selectedQuestion} 
                 onChange={(e) => setSelectedQuestion(e.target.value)}
-                className="w-full border rounded-md p-2"
+                className="w-full border rounded-md p-2 text-gray-900"
               >
                 <option value="">Select Question...</option>
                 {questions.map(q => (
@@ -200,7 +200,7 @@ export default function ScanPage() {
                 value={extractedText}
                 onChange={(e) => setExtractedText(e.target.value)}
                 rows={6}
-                className="w-full border rounded-md p-2 font-mono text-lg bg-yellow-50"
+                className="w-full border rounded-md p-2 font-mono text-lg bg-yellow-50 placeholder:text-gray-500 text-gray-900"
                 placeholder="Scan result will appear here..."
               />
             </div>
