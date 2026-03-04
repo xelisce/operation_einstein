@@ -24,6 +24,9 @@ const QuestionList = ({ quizId, refreshTrigger }: Props) => {
   const [questions, setQuestions] = useState<QuestionWithAverage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCorrect, setEditCorrect] = useState('');
+  const [editPoints, setEditPoints] = useState<number | ''>('');
 
   const fetchQuestions = async () => {
     if (!quizId) return;
@@ -130,6 +133,117 @@ const QuestionList = ({ quizId, refreshTrigger }: Props) => {
               ))}
             </ul>
           )}
+
+          {/* Edit controls for correct answer and points */}
+          <div className="mt-3">
+            {editingId === q.question_id ? (
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Correct Answer (optional)</label>
+                  <input
+                    type="text"
+                    value={editCorrect}
+                    onChange={(e) => setEditCorrect(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Points</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editPoints as any}
+                    onChange={(e) => setEditPoints(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="mt-1 block w-32 rounded-md border-gray-300 shadow-sm p-2"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      // Save changes
+                      try {
+                        const updates: any = { correct_answer: editCorrect || null };
+                        if (editPoints !== '') updates.points = editPoints || 0;
+
+                        const { data, error } = await supabase
+                          .from('questions')
+                          .update(updates)
+                          .eq('question_id', q.question_id)
+                          .select()
+                          .single();
+
+                        if (error) throw error;
+
+                        // Update local state
+                        setQuestions(prev => prev.map(item => item.question_id === q.question_id ? { ...item, ...data } : item));
+                        setEditingId(null);
+                      } catch (err: any) {
+                        alert('Error saving question: ' + (err.message || JSON.stringify(err)));
+                      }
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="inline-flex items-center px-3 py-1.5 bg-gray-200 text-gray-800 rounded"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditingId(q.question_id);
+                    setEditCorrect((q as any).correct_answer || '');
+                    setEditPoints((q as any).points ?? 1);
+                  }}
+                  className="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={async () => {
+                    const ok = confirm('Delete this question? This will also remove its options and responses.');
+                    if (!ok) return;
+                    try {
+                      // delete question
+                      const { error: delQErr } = await supabase
+                        .from('questions')
+                        .delete()
+                        .eq('question_id', q.question_id);
+                      if (delQErr) throw delQErr;
+
+                      // delete options
+                      const { error: delOErr } = await supabase
+                        .from('questionoptions')
+                        .delete()
+                        .eq('question_id', q.question_id);
+                      if (delOErr) throw delOErr;
+
+                      // delete responses
+                      const { error: delRErr } = await supabase
+                        .from('responses')
+                        .delete()
+                        .eq('question_id', q.question_id);
+                      if (delRErr) throw delRErr;
+
+                      // update UI
+                      setQuestions(prev => prev.filter(item => item.question_id !== q.question_id));
+                    } catch (err: any) {
+                      alert('Error deleting question: ' + (err.message || JSON.stringify(err)));
+                    }
+                  }}
+                  className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       ))}
     </div>

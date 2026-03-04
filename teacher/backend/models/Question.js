@@ -24,6 +24,16 @@ const QuestionSchema = new mongoose.Schema({
       message: 'Options are required for multiple-choice questions.'
     }
   },
+  // Optional correct answer for auto-grading. If not provided,
+  // the question is treated as having no answer and students receive full points.
+  correctAnswer: {
+    type: String,
+  },
+  // Optional points for the question. Defaults to 1 when not specified.
+  points: {
+    type: Number,
+    default: 1,
+  },
   category: {
     type: String,
   },

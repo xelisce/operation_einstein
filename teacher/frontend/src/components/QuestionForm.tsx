@@ -12,6 +12,8 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   const [text, setText] = useState('');
   const [type, setType] = useState('text');
   const [options, setOptions] = useState('');
+  const [correctAnswer, setCorrectAnswer] = useState('');
+  const [points, setPoints] = useState(1);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,6 +30,8 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
             assignment_id: quizId,
             question_text: text,
             type: type,
+            correct_answer: correctAnswer || null,
+            points: points || 1,
             question_order: Math.floor(Math.random() * 10000) // Safe integer
           }
         ])
@@ -54,6 +58,8 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
       alert('Question created successfully!');
       setText('');
       setOptions('');
+      setCorrectAnswer('');
+      setPoints(1);
       setType('text');
       if (onQuestionCreated) onQuestionCreated();
     } catch (error: any) {
@@ -121,6 +127,40 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
           />
         </div>
       )}
+
+      <div>
+        <label
+          htmlFor="correctAnswer"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Correct Answer (optional)
+        </label>
+        <input
+          id="correctAnswer"
+          type="text"
+          value={correctAnswer}
+          onChange={(e) => setCorrectAnswer(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 text-gray-900"
+          placeholder="Leave empty to treat question as ungraded"
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor="points"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Points (optional)
+        </label>
+        <input
+          id="points"
+          type="number"
+          min={0}
+          value={points}
+          onChange={(e) => setPoints(Number(e.target.value || 0))}
+          className="mt-1 block w-32 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 text-gray-900"
+        />
+      </div>
 
       <button
         type="submit"

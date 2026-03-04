@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type AnswerRateData = {
   quizId: string;
@@ -24,6 +25,8 @@ type Props = {
 
 const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) => {
   const [data, setData] = useState<AnswerRateData | null>(null);
+  const [scores, setScores] = useState<{ studentId: string; total: number }[] | null>(null);
+  const [maxScore, setMaxScore] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,10 +44,10 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
 
       const assignedCount = new Set((enrollments || []).map(e => e.student_id)).size;
 
-      // 2. retrieve question IDs for this quiz
+      // 2. retrieve question IDs and metadata for this quiz
       const { data: qData, error: qErr } = await supabase
         .from('questions')
-        .select('question_id')
+        .select('question_id,correct_answer,points,type')
         .eq('assignment_id', quizId);
       if (qErr) throw qErr;
 
@@ -52,13 +55,17 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
 
       let startedCount = 0;
       let finishedCount = 0;
+      // scoring helpersS
+      let scoreResults: { studentId: string; total: number }[] = [];
+      let maxScoreLocal = 0;
 
       if (questionIds.length > 0) {
-        // fetch responses for those questions
+        // fetch responses for those questions (newest first)
         const { data: responses, error: rErr } = await supabase
           .from('responses')
-          .select('student_id,question_id')
-          .in('question_id', questionIds);
+          .select('student_id,question_id,answer_text,created_at')
+          .in('question_id', questionIds)
+          .order('created_at', { ascending: false });
         if (rErr) throw rErr;
 
         const studentMap: Record<string, Set<string>> = {};
@@ -69,6 +76,50 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
         });
         startedCount = Object.keys(studentMap).length;
         finishedCount = Object.values(studentMap).filter(s => s.size === questionIds.length).length;
+
+        // prepare question metadata map for scoring
+        const qMap: Record<string, any> = {};
+        (qData || []).forEach((q: any) => {
+          const pts = (typeof q.points === 'number') ? q.points : 1;
+          qMap[q.question_id] = { correct: q.correct_answer, points: pts, type: q.type };
+          maxScoreLocal += pts;
+        });
+
+        // build latest response per student per question (responses are ordered newest-first)
+        const latest: Record<string, Record<string, any>> = {};
+        (responses || []).forEach((r: any) => {
+          const sid = r.student_id;
+          const qid = r.question_id;
+          latest[sid] = latest[sid] || {};
+          if (!latest[sid][qid]) latest[sid][qid] = r;
+        });
+
+        // compute totals for each enrolled student
+        const studentIds = new Set((enrollments || []).map(e => e.student_id));
+        studentIds.forEach((sid) => {
+          let total = 0;
+          for (const qid of questionIds) {
+            const qmeta = qMap[qid];
+            if (!qmeta) continue;
+            const p = qmeta.points || 1;
+            if (!qmeta.correct) {
+              total += p; // full points when no correct answer configured
+              continue;
+            }
+            const resp = latest[sid] ? latest[sid][qid] : undefined;
+            if (!resp) continue; // no response => zero
+
+            const normalize = (s: any) => (s || '').toString().trim().toLowerCase();
+            let correct = false;
+            if (qmeta.type === 'scale') {
+              correct = Number(resp.answer_text) === Number(qmeta.correct);
+            } else {
+              correct = normalize(resp.answer_text) === normalize(qmeta.correct);
+            }
+            if (correct) total += p;
+          }
+          scoreResults.push({ studentId: sid, total });
+        });
       }
 
       // 3. optionally fetch the quiz title if not provided
@@ -102,6 +153,13 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
         startedRate: assignedCount > 0 ? (startedCount / assignedCount) * 100 : 0,
         finishedRate: assignedCount > 0 ? (finishedCount / assignedCount) * 100 : 0,
       });
+      if (scoreResults.length > 0) {
+        setScores(scoreResults);
+        setMaxScore(maxScoreLocal);
+      } else {
+        setScores(null);
+        setMaxScore(0);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -197,6 +255,70 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
       <p className="text-xs text-gray-500">
         Class: <span className="font-semibold">{data.className}</span>
       </p>
+      {/* Score Distribution Histogram */}
+      <div className="mt-6">
+        <h4 className="text-sm font-semibold text-gray-700 mb-4">Score Distribution</h4>
+        {scores && scores.length > 0 && maxScore > 0 ? (
+          <>
+            {/* Build distribution data */}
+            {(() => {
+              const distribution: Record<number, string[]> = {};
+              for (let i = 0; i <= maxScore; i++) {
+                distribution[i] = [];
+              }
+              scores.forEach(s => {
+                distribution[s.total].push(s.studentId);
+              });
+              const chartData = Object.entries(distribution).map(([score, students]) => ({
+                score: parseInt(score),
+                count: students.length,
+                students: students.sort()
+              }));
+              return (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="score"
+                      label={{ value: `Score (out of ${maxScore})`, position: 'insideBottom', offset: -10 }}
+                    />
+                    <YAxis 
+                      label={{ value: 'Number of Students', angle: -90, position: 'insideLeft', offset: -10 }}
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload[0]) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                              <p className="font-semibold text-sm">Score: {data.score}/{maxScore}</p>
+                              <p className="text-sm text-gray-700">Students: {data.count}</p>
+                              {data.students.length > 0 && (
+                                <div className="text-xs mt-2">
+                                  <p className="font-medium">Student IDs:</p>
+                                  <ul className="max-h-32 overflow-y-auto">
+                                    {data.students.map((sid: string) => (
+                                      <li key={sid} className="text-gray-700">- {sid}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="count" fill="#4f46e5" />
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            })()}
+          </>
+        ) : (
+          <p className="text-sm text-gray-500">No scores available yet.</p>
+        )}
+      </div>
     </div>
   );
 };
