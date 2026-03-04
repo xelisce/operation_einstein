@@ -9,8 +9,10 @@ type AnswerRateData = {
   classId: string;
   className?: string;
   assignedCount: number;
-  completedCount: number;
-  answerRate: number;
+  startedCount: number;      // responded at least once
+  finishedCount: number;     // answered all questions
+  startedRate: number;
+  finishedRate: number;
 };
 
 type Props = {
@@ -39,8 +41,7 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
 
       const assignedCount = new Set((enrollments || []).map(e => e.student_id)).size;
 
-      // 2. count distinct students who have responses for this quiz
-      // first retrieve all question IDs belonging to the assignment
+      // 2. retrieve question IDs for this quiz
       const { data: qData, error: qErr } = await supabase
         .from('questions')
         .select('question_id')
@@ -49,14 +50,25 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
 
       const questionIds = (qData || []).map(q => q.question_id);
 
-      let completedCount = 0;
+      let startedCount = 0;
+      let finishedCount = 0;
+
       if (questionIds.length > 0) {
+        // fetch responses for those questions
         const { data: responses, error: rErr } = await supabase
           .from('responses')
-          .select('student_id')
+          .select('student_id,question_id')
           .in('question_id', questionIds);
         if (rErr) throw rErr;
-        completedCount = new Set((responses || []).map(r => r.student_id)).size;
+
+        const studentMap: Record<string, Set<string>> = {};
+        (responses || []).forEach((r: any) => {
+          const sid = r.student_id;
+          if (!studentMap[sid]) studentMap[sid] = new Set();
+          studentMap[sid].add(r.question_id);
+        });
+        startedCount = Object.keys(studentMap).length;
+        finishedCount = Object.values(studentMap).filter(s => s.size === questionIds.length).length;
       }
 
       // 3. optionally fetch the quiz title if not provided
@@ -85,8 +97,10 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
         classId,
         className: wData?.title,
         assignedCount,
-        completedCount,
-        answerRate: assignedCount > 0 ? (completedCount / assignedCount) * 100 : 0
+        startedCount,
+        finishedCount,
+        startedRate: assignedCount > 0 ? (startedCount / assignedCount) * 100 : 0,
+        finishedRate: assignedCount > 0 ? (finishedCount / assignedCount) * 100 : 0,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -94,6 +108,7 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchAnswerRate();
@@ -103,42 +118,79 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
   if (error) return <div className="text-red-500">Error: {error}</div>;
   if (!data) return <div className="text-gray-500">No data available</div>;
 
-  // Determine color based on answer rate
-  const rateColor =
-    data.answerRate >= 80 ? 'text-green-600' :
-    data.answerRate >= 60 ? 'text-yellow-600' :
+  // threshold constants
+  const YELLOW_THRESH = 60;
+  const GREEN_THRESH = 80;
+  // colors for each bar
+  const startedColor =
+    data.startedRate >= GREEN_THRESH ? 'text-green-600' :
+    data.startedRate >= YELLOW_THRESH ? 'text-yellow-600' :
+    'text-orange-600';
+  const finishedColor =
+    data.finishedRate >= GREEN_THRESH ? 'text-green-600' :
+    data.finishedRate >= YELLOW_THRESH ? 'text-yellow-600' :
     'text-orange-600';
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Answer Rate: {data.quizTitle}</h3>
-      
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+        {data.quizTitle}
+      </h3>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <div>
           <p className="text-sm text-gray-600">Assigned Students</p>
-          <p className="text-2xl font-bold text-gray-900">{data.assignedCount}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {data.assignedCount}
+          </p>
         </div>
         <div>
-          <p className="text-sm text-gray-600">Completed</p>
-          <p className="text-2xl font-bold text-gray-900">{data.completedCount}</p>
+          <p className="text-sm text-gray-600">Started</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {data.startedCount}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Finished</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {data.finishedCount}
+          </p>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-700">Completion Rate</span>
-          <span className={`text-2xl font-bold ${rateColor}`}>{data.answerRate.toFixed(1)}%</span>
+      {/* Bars for started and finished rates */}
+      <div className="space-y-4 mb-4">
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">Started Rate</span>
+            <span className={`text-2xl font-bold ${startedColor}`}>{data.startedRate.toFixed(1)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-4">
+            <div
+              className={`h-4 rounded-full transition-all duration-300 ${
+                data.startedRate >= GREEN_THRESH ? 'bg-green-500' :
+                data.startedRate >= YELLOW_THRESH ? 'bg-yellow-500' :
+                'bg-orange-500'
+              }`}
+              style={{ width: `${data.startedRate}%` }}
+            />
+          </div>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-4">
-          <div
-            className={`h-4 rounded-full transition-all duration-300 ${
-              data.answerRate >= 80 ? 'bg-green-500' :
-              data.answerRate >= 60 ? 'bg-yellow-500' :
-              'bg-orange-500'
-            }`}
-            style={{ width: `${data.answerRate}%` }}
-          />
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">Finished Rate</span>
+            <span className={`text-2xl font-bold ${finishedColor}`}>{data.finishedRate.toFixed(1)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-4">
+            <div
+              className={`h-4 rounded-full transition-all duration-300 ${
+                data.finishedRate >= GREEN_THRESH ? 'bg-green-500' :
+                data.finishedRate >= YELLOW_THRESH ? 'bg-yellow-500' :
+                'bg-orange-500'
+              }`}
+              style={{ width: `${data.finishedRate}%` }}
+            />
+          </div>
         </div>
       </div>
 

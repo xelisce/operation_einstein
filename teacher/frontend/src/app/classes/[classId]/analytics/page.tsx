@@ -81,37 +81,36 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left: Question completion */}
-        <div className="space-y-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">
-              Quiz completion
-            </h2>
-            {loading ? (
-              <p className="text-gray-500">Loading quizzes...</p>
-            ) : quizzes.length === 0 ? (
-              <div className="bg-white p-8 rounded-lg shadow text-center">
-                <p className="text-gray-500 text-lg">
-                  No quizzes found for this class.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {quizzes.map((quiz) => (
-                  <AnswerRateCard
-                    key={quiz.assignment_id}
-                    quizId={quiz.assignment_id}
-                    quizTitle={quiz.title}
-                    classId={classId}
-                    refreshTrigger={refreshTrigger}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">
+            Quiz analytics
+          </h2>
+
+          {loading ? (
+            <p className="text-gray-500">Loading quizzes...</p>
+          ) : quizzes.length === 0 ? (
+            <div className="bg-white p-8 rounded-lg shadow text-center">
+              <p className="text-gray-500 text-lg">
+                No quizzes found for this class.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {quizzes.map((quiz) => (
+                <AnswerRateCard
+                  key={quiz.assignment_id}
+                  quizId={quiz.assignment_id}
+                  quizTitle={quiz.title}
+                  classId={classId}
+                  refreshTrigger={refreshTrigger}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>
   );
 }
+

@@ -69,7 +69,12 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="text" className="block text-sm font-medium text-gray-700">Question Text</label>
+        <label
+          htmlFor="text"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Question Text
+        </label>
         <input
           id="text"
           type="text"
@@ -81,7 +86,12 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
       </div>
 
       <div>
-        <label htmlFor="type" className="block text-sm font-medium text-gray-700">Type</label>
+        <label
+          htmlFor="type"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Type
+        </label>
         <select
           id="type"
           value={type}
@@ -93,9 +103,14 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
         </select>
       </div>
 
-      {type === 'multiple-choice' && (
+      {type === "multiple-choice" && (
         <div>
-          <label htmlFor="options" className="block text-sm font-medium text-gray-700">Options (comma separated)</label>
+          <label
+            htmlFor="options"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Options (comma separated)
+          </label>
           <input
             id="options"
             type="text"
@@ -110,9 +125,9 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
       <button
         type="submit"
         disabled={loading}
-        className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+        className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${loading ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
       >
-        {loading ? 'Saving...' : 'Save Question'}
+        {loading ? "Saving..." : "Save Question"}
       </button>
     </form>
   );
