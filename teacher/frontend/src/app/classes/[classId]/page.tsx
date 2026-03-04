@@ -72,6 +72,54 @@ export default function ClassDetail() {
     else setStudents(data || []);
   };
 
+  // delete handler moved out of JSX
+  const handleDeleteClass = async () => {
+    if (!classId) return;
+    if (!confirm('Are you sure you want to delete this workshop? This cannot be undone.')) return;
+    try {
+      // cascade delete steps
+      const { data: assignments, error: aErr } = await supabase
+        .from('assignments')
+        .select('assignment_id')
+        .eq('workshop_id', classId);
+      if (aErr) throw aErr;
+
+      const assignmentIds = (assignments || []).map((a: any) => a.assignment_id);
+      let questionIds: string[] = [];
+
+      if (assignmentIds.length) {
+        const { data: questions, error: qErr } = await supabase
+          .from('questions')
+          .select('question_id')
+          .in('assignment_id', assignmentIds);
+        if (qErr) throw qErr;
+        questionIds = (questions || []).map((q: any) => q.question_id);
+      }
+
+      if (questionIds.length) {
+        await supabase.from('responses').delete().in('question_id', questionIds);
+        await supabase.from('questionoptions').delete().in('question_id', questionIds);
+        await supabase.from('questions').delete().in('question_id', questionIds);
+      }
+
+      if (assignmentIds.length) {
+        await supabase.from('assignments').delete().in('assignment_id', assignmentIds);
+      }
+
+      await supabase.from('enrollments').delete().eq('workshop_id', classId);
+
+      const { error } = await supabase
+        .from('workshops')
+        .delete()
+        .eq('workshop_id', classId);
+      if (error) throw error;
+
+      router.push('/');
+    } catch (err: any) {
+      alert(`Failed to delete: ${err.message || JSON.stringify(err)}`);
+    }
+  };
+
   useEffect(() => {
     if (classId) {
       fetchClass();
@@ -211,19 +259,7 @@ export default function ClassDetail() {
               View Analytics
             </Link>
             <button
-              onClick={async () => {
-                if (!classId) return;
-                if (!confirm('Are you sure you want to delete this workshop? This cannot be undone.')) return;
-                const { error } = await supabase
-                  .from('workshops')
-                  .delete()
-                  .eq('workshop_id', classId);
-                if (error) {
-                  alert(`Failed to delete: ${error.message}`);
-                } else {
-                  router.push('/');
-                }
-              }}
+              onClick={handleDeleteClass}
               className="inline-block bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
             >
               Delete Class
