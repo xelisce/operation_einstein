@@ -15,6 +15,7 @@ export default function ScanPage() {
 
   // Data State
   const [questions, setQuestions] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]); // enrolled students with profile info
   const [studentId, setStudentId] = useState('');
   const [selectedQuestion, setSelectedQuestion] = useState('');
 
@@ -36,7 +37,15 @@ export default function ScanPage() {
       .select('*')
       .eq('assignment_id', quizId)
       .then(({ data }) => setQuestions(data || []));
-  }, [quizId]);
+
+    // also load enrolled students for this class so teacher can choose from a dropdown
+    if (classId) {
+      supabase.from('enrollments')
+        .select('student_id, profiles(name)')
+        .eq('workshop_id', classId)
+        .then(({ data }) => setStudents(data || []));
+    }
+  }, [quizId, classId]);
 
   // Handle Image Selection
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,14 +177,23 @@ export default function ScanPage() {
 
           <div className="space-y-6 border-l pl-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
-              <input 
-                type="text" 
+              <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
+              <select
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                placeholder="Enter Student ID"
-                className="w-full border rounded-md p-2 placeholder:text-gray-500 text-gray-900"
-              />
+                className="w-full border rounded-md p-2 text-gray-900"
+              >
+                <option value="">Select student...</option>
+                {students.map((s) => {
+                  // if profile join returned an object
+                  const name = s.profiles?.name || '';
+                  return (
+                    <option key={s.student_id} value={s.student_id}>
+                      {name ? `${name} (${s.student_id})` : s.student_id}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div>

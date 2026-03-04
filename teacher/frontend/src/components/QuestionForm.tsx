@@ -13,7 +13,7 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   const [type, setType] = useState('text');
   const [options, setOptions] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState('');
-  const [points, setPoints] = useState(1);
+  const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,7 +31,7 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
             question_text: text,
             type: type,
             correct_answer: correctAnswer || null,
-            points: points || 1,
+            points: points ?? 0,
             question_order: Math.floor(Math.random() * 10000) // Safe integer
           }
         ])

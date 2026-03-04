@@ -80,7 +80,7 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
         // prepare question metadata map for scoring
         const qMap: Record<string, any> = {};
         (qData || []).forEach((q: any) => {
-          const pts = (typeof q.points === 'number') ? q.points : 1;
+          const pts = (typeof q.points === 'number') ? q.points : 0;
           qMap[q.question_id] = { correct: q.correct_answer, points: pts, type: q.type };
           maxScoreLocal += pts;
         });
@@ -101,7 +101,7 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
           for (const qid of questionIds) {
             const qmeta = qMap[qid];
             if (!qmeta) continue;
-            const p = qmeta.points || 1;
+            const p = qmeta.points || 0;
             if (!qmeta.correct) {
               total += p; // full points when no correct answer configured
               continue;
@@ -276,29 +276,46 @@ const AnswerRateCard = ({ quizId, classId, quizTitle, refreshTrigger }: Props) =
               }));
               return (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
+                    <XAxis
                       dataKey="score"
-                      label={{ value: `Score (out of ${maxScore})`, position: 'insideBottom', offset: -10 }}
+                      label={{
+                        value: `Score (out of ${maxScore})`,
+                        position: "insideBottom",
+                        offset: -10,
+                      }}
                     />
-                    <YAxis 
-                      label={{ value: 'Number of Students', angle: -90, position: 'insideLeft', offset: -10 }}
+                    <YAxis
+                      label={{
+                        value: "No. of Students",
+                        angle: -90,
+                        position: "insideLeft"
+                      }}
                     />
-                    <Tooltip 
+                    <Tooltip
                       content={({ active, payload }) => {
                         if (active && payload && payload[0]) {
                           const data = payload[0].payload;
                           return (
                             <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
-                              <p className="font-semibold text-sm">Score: {data.score}/{maxScore}</p>
-                              <p className="text-sm text-gray-700">Students: {data.count}</p>
+                              <p className="font-semibold text-sm">
+                                Score: {data.score}/{maxScore}
+                              </p>
+                              <p className="text-sm text-gray-700">
+                                Students: {data.count}
+                              </p>
                               {data.students.length > 0 && (
                                 <div className="text-xs mt-2">
                                   <p className="font-medium">Student IDs:</p>
                                   <ul className="max-h-32 overflow-y-auto">
                                     {data.students.map((sid: string) => (
-                                      <li key={sid} className="text-gray-700">- {sid}</li>
+                                      <li key={sid} className="text-gray-700">
+                                        - {sid}
+                                      </li>
                                     ))}
                                   </ul>
                                 </div>

@@ -81,7 +81,7 @@ router.get('/:id/scores', async (req, res) => {
     let maxScore = 0;
     const qPoints = {};
     for (const q of questions) {
-      const p = (typeof q.points === 'number') ? q.points : 1;
+      const p = (typeof q.points === 'number') ? q.points : 0;
       qPoints[q._id.toString()] = p;
       maxScore += p;
     }
@@ -96,7 +96,7 @@ router.get('/:id/scores', async (req, res) => {
 
       for (const q of questions) {
         const qid = q._id.toString();
-        const p = qPoints[qid] || 1;
+        const p = qPoints[qid] || 0;
 
         // If question has no correctAnswer configured -> award full points
         if (!q.correctAnswer) {

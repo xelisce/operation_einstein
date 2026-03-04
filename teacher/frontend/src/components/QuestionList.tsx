@@ -199,7 +199,7 @@ const QuestionList = ({ quizId, refreshTrigger }: Props) => {
                   onClick={() => {
                     setEditingId(q.question_id);
                     setEditCorrect((q as any).correct_answer || '');
-                    setEditPoints((q as any).points ?? 1);
+                    setEditPoints((q as any).points ?? 0);
                   }}
                   className="inline-flex items-center px-3 py-1.5 bg-indigo-600 text-white rounded"
                 >

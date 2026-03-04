@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Workshop = {
@@ -30,6 +30,12 @@ export default function ClassDetail() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'quizzes' | 'students'>('quizzes');
   const [loading, setLoading] = useState(true);
+
+  // editing title
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+
+  const router = useRouter();
 
   const fetchClass = async () => {
     const { data, error } = await supabase
@@ -73,6 +79,13 @@ export default function ClassDetail() {
       fetchStudents();
     }
   }, [classId]);
+
+  // when class data loads, initialize title input
+  useEffect(() => {
+    if (classData) {
+      setTitleInput(classData.title);
+    }
+  }, [classData]);
 
   const handleEnrolStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,17 +153,81 @@ export default function ClassDetail() {
           <Link href="/" className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
             &larr; Back to Dashboard
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">{classData.title}</h1>
+          <div className="flex items-center gap-2">
+            {editingTitle ? (
+              <>
+                <input
+                  value={titleInput}
+                  onChange={e => setTitleInput(e.target.value)}
+                  className="text-3xl font-bold text-gray-900 border-b-2 focus:outline-none"
+                />
+                <button
+                  onClick={async () => {
+                    if (!titleInput.trim() || !classId) return;
+                    const { error } = await supabase
+                      .from('workshops')
+                      .update({ title: titleInput })
+                      .eq('workshop_id', classId);
+                    if (error) alert(`Failed to update title: ${error.message}`);
+                    else {
+                      setClassData(prev => prev ? { ...prev, title: titleInput } : prev);
+                      setEditingTitle(false);
+                    }
+                  }}
+                  className="text-green-600 hover:text-green-800 text-sm"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTitle(false);
+                    setTitleInput(classData.title);
+                  }}
+                  className="text-gray-600 hover:text-gray-800 text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl font-bold text-gray-900">{classData.title}</h1>
+                <button
+                  onClick={() => setEditingTitle(true)}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm ml-2"
+                >
+                  Edit
+                </button>
+              </>
+            )}
+          </div>
           <p className="text-gray-500">{classData.code}</p>
 
-          {/* analytics link */}
-          <div className="mt-4">
+          {/* analytics link and management buttons */}
+          <div className="mt-4 flex items-center gap-4">
             <Link
               href={`/classes/${classId}/analytics`}
               className="inline-block bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700 text-sm"
             >
               View Analytics
             </Link>
+            <button
+              onClick={async () => {
+                if (!classId) return;
+                if (!confirm('Are you sure you want to delete this workshop? This cannot be undone.')) return;
+                const { error } = await supabase
+                  .from('workshops')
+                  .delete()
+                  .eq('workshop_id', classId);
+                if (error) {
+                  alert(`Failed to delete: ${error.message}`);
+                } else {
+                  router.push('/');
+                }
+              }}
+              className="inline-block bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
+            >
+              Delete Class
+            </button>
           </div>
 
           {/* Tabs */}
