@@ -117,7 +117,7 @@ export default async function AssignmentPage({
                     <input
                       type="radio"
                       name={`q_${q.questionId}`}
-                      value={opt.questionOptionId}
+                      value={opt.optionText}
                     />
                     <span>{opt.optionText}</span>
                   </label>
@@ -131,7 +131,7 @@ export default async function AssignmentPage({
           </section>
         ))}
       </div>
-      <SubmitAssignmentButton questions={questions} workshopId={assignment.workshopId} />
+      <SubmitAssignmentButton questions={questions} workshopId={assignment.workshopId} assignmentId={assignmentId} />
     </main>
   );
 }

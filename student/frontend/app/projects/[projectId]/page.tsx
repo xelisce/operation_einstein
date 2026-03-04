@@ -4,9 +4,11 @@ import { useParams } from "next/navigation";
 import RichTextEditor from "./richTextEditor";
 import "./print.css";
 import type { Project, ProjectQuestion } from "../../models/types";
+import { useAuth } from "../../useAuth";
 type AnswerPayload = { html: string; delta: unknown };
 
 export default function FinalReportPage() {
+  const { user } = useAuth();
   const params = useParams<{ projectId: string }>();
   const projectId = params?.projectId;
   const [project, setProject] = useState<Project | null>(null);
@@ -23,7 +25,7 @@ export default function FinalReportPage() {
   }, []);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !user) return;
     let cancelled = false;
 
     async function load() {
@@ -33,7 +35,7 @@ export default function FinalReportPage() {
         const [pRes, qRes, rRes] = await Promise.all([
           fetch(`${base}/api/projects/${projectId}`),
           fetch(`${base}/api/projects/${projectId}/questions`),
-          fetch(`${base}/api/projects/${projectId}/responses`),
+          fetch(`${base}/api/projects/${projectId}/responses?studentId=${user!.id}`),
         ]);
         if (!pRes.ok) throw new Error("Failed to load project");
         if (!qRes.ok) throw new Error("Failed to load questions");
@@ -73,7 +75,7 @@ export default function FinalReportPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, user]);
 
   const title = useMemo(() => {
     if (!projectId || loading) return "Loading…";
@@ -86,7 +88,7 @@ export default function FinalReportPage() {
   };
 
   const handleSave = async () => {
-    if (!projectId) return;
+    if (!projectId || !user) return;
 
     try {
       setSaveStatus("saving");
@@ -101,11 +103,13 @@ export default function FinalReportPage() {
       const resp = await fetch(`${base}/api/projects/${projectId}/responses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ responses: payload }),
+        body: JSON.stringify({ responses: payload, studentId: user.id }),
       });
+      console.log(payload);
 
       if (!resp.ok) {
         const txt = await resp.text();
+        console.log("Failed to save responses:", txt);
         throw new Error(txt);
       }
 

@@ -84,11 +84,27 @@ app.get("/api/workshops/:workshopId/assignments", async (req, res) => {
   );
 });
 
-//GET dashboard data
+//GET dashboard data for a specific student
 app.get("/api/dashboard", async (req, res) => {
+  const { studentId } = req.query;
+  if (!studentId) return res.status(400).json({ error: "studentId query param is required" });
+  const { data: enrollments, error: eErr } = await supabase
+    .from("enrollments")
+    .select("workshop_id")
+    .eq("student_id", studentId);
+
+  if (eErr) return res.status(500).json({ error: eErr.message });
+
+  const workshopIds = enrollments.map((e) => e.workshop_id);
+
+  if (workshopIds.length === 0) {
+    return res.json({ workshops: [], todoList: [] });
+  }
+
   const { data: workshops, error: wErr } = await supabase
     .from("workshops")
-    .select("workshop_id,title,code,color,term");
+    .select("workshop_id,title,code,color,term")
+    .in("workshop_id", workshopIds);
 
   if (wErr) return res.status(500).json({ error: wErr.message });
 
@@ -98,7 +114,8 @@ app.get("/api/dashboard", async (req, res) => {
 
   const { data: assignments, error: aErr } = await supabase
     .from("assignments")
-    .select("assignment_id,workshop_id,title,points,due_date,assignment_type");
+    .select("assignment_id,workshop_id,title,points,due_date,assignment_type")
+    .in("workshop_id", workshopIds);
 
   if (aErr) return res.status(500).json({ error: aErr.message });
   return res.json({
@@ -199,6 +216,33 @@ app.get("/api/questions/:questionId/options", async (req, res) => {
   }
 });
 
+//POST save/update responses for an assignment per student
+app.post('/api/assignments/:assignmentId/responses', async (req, res) => {
+  const { assignmentId } = req.params;
+  const { studentId, responses } = req.body;
+
+  if (!studentId || !responses) {
+    return res.status(400).json({ error: "Student ID and responses are required." });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('responses')
+      .insert(responses.map(response => ({
+        question_id: response.questionId,
+        student_id: studentId,
+        answer_text: response.answerText,
+      })));
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json({ message: 'Responses updated successfully', data });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 //GET all projects for a workshop
 app.get("/api/workshops/:workshopId/projects", async (req, res) => {
   try {
@@ -265,27 +309,26 @@ app.get("/api/projects/:projectId/questions", async (req, res) => {
   }
 });
 
-// POST save/update responses for a project
+// POST save/update responses for a project per student
 app.post("/api/projects/:projectId/responses", async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { responses } = req.body;
-
-    if (!Array.isArray(responses)) {
-      return res.status(400).json({ error: "responses must be an array" });
-    }
+    const { responses, studentId } = req.body;
+    if (!studentId) return res.status(400).json({ error: "studentId is required" });
+    if (!Array.isArray(responses)) return res.status(400).json({ error: "responses must be an array" });
 
     const rows = responses.map((r) => ({
       project_id: projectId,
       question_id: r.questionId,
       content_html: r.contentHtml ?? "",
       content_delta: r.contentDelta ?? null,
+      student_id: studentId,
     }));
 
     const { data, error } = await supabase
       .from("project_responses")
-      .upsert(rows, { onConflict: "project_id,question_id" })
-      .select("response_id, project_id, question_id");
+      .upsert(rows, { onConflict: "question_id,student_id" });
+    //.select("response_id, project_id, question_id");
 
     if (error) return res.status(400).json({ error: error.message });
 
@@ -296,15 +339,18 @@ app.post("/api/projects/:projectId/responses", async (req, res) => {
   }
 });
 
-// GET all responses for a project (1 per question)
+// GET all responses for a project for a specific student
 app.get("/api/projects/:projectId/responses", async (req, res) => {
   try {
     const { projectId } = req.params;
+    const { studentId } = req.query;
+    if (!studentId) return res.status(400).json({ error: "studentId query param is required" });
 
     const { data, error } = await supabase
       .from("project_responses")
-      .select("response_id, project_id, question_id, content_html, content_delta")
-      .eq("project_id", projectId);
+      .select("response_id, project_id, question_id, content_html, content_delta, student_id")
+      .eq("project_id", projectId)
+      .eq("student_id", studentId);
 
     if (error) return res.status(400).json({ error: error.message });
 
@@ -322,7 +368,6 @@ app.get("/api/projects/:projectId/responses", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 //Start server
 app.listen(process.env.PORT || 4000, () => {
