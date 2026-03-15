@@ -9,6 +9,7 @@ type Workshop = {
   workshop_id: string;
   title: string;
   code: string;
+  category_id: string;
 };
 
 type Assignment = {
@@ -198,8 +199,8 @@ export default function ClassDetail() {
       {/* Header */}
       <div className="bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <Link href="/" className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
-            &larr; Back to Dashboard
+          <Link href={`/categories/${classData.category_id}`} className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
+            &larr; Back to Category
           </Link>
           <div className="flex items-center gap-2">
             {editingTitle ? (
