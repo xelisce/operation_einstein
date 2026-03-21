@@ -2,10 +2,14 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import supabase from "./supabaseClient.js";
+import { Resend } from "resend";
+import multer from "multer";
 
 const app = express();
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:3000" }));
 app.use(express.json());
+const upload = multer();
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 //dummy api
 app.get("/api/hello", (req, res) => {
@@ -368,6 +372,28 @@ app.get("/api/projects/:projectId/responses", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+//Email PDF endpoint
+app.post("/api/email/send-report", upload.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "No file" });
+
+    await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: process.env.ADMIN_EMAIL,
+      subject: `Final Report: ${file.originalname.replace(".pdf", "")}`,
+      text: "A new final report has been submitted. See attached.",
+      attachments: [{ filename: file.originalname, content: file.buffer }],
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Email send failed:", err);
+    return res.status(500).json({ error: "Failed to send email" });
+  }
+});
+
 
 //Start server
 app.listen(process.env.PORT || 4000, () => {

@@ -216,6 +216,13 @@ export default function FinalReportPage() {
       }
 
       doc.save(filename);
+      const pdfBlob = doc.output("blob");
+      const formData = new FormData();
+      formData.append("file", pdfBlob, filename);
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/email/send-report`, {
+        method: "POST",
+        body: formData,
+      });
       console.log("[PDF Export] success, pages:", page);
     } catch (e) {
       console.error("[PDF Export] failed:", e);
