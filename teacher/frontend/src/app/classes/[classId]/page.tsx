@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Workshop = {
   workshop_id: string;
   title: string;
   code: string;
+  category_id: string;
 };
 
 type Assignment = {
@@ -30,6 +31,12 @@ export default function ClassDetail() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'quizzes' | 'students'>('quizzes');
   const [loading, setLoading] = useState(true);
+
+  // editing title
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+
+  const router = useRouter();
 
   const fetchClass = async () => {
     const { data, error } = await supabase
@@ -66,6 +73,54 @@ export default function ClassDetail() {
     else setStudents(data || []);
   };
 
+  // delete handler moved out of JSX
+  const handleDeleteClass = async () => {
+    if (!classId) return;
+    if (!confirm('Are you sure you want to delete this workshop? This cannot be undone.')) return;
+    try {
+      // cascade delete steps
+      const { data: assignments, error: aErr } = await supabase
+        .from('assignments')
+        .select('assignment_id')
+        .eq('workshop_id', classId);
+      if (aErr) throw aErr;
+
+      const assignmentIds = (assignments || []).map((a: any) => a.assignment_id);
+      let questionIds: string[] = [];
+
+      if (assignmentIds.length) {
+        const { data: questions, error: qErr } = await supabase
+          .from('questions')
+          .select('question_id')
+          .in('assignment_id', assignmentIds);
+        if (qErr) throw qErr;
+        questionIds = (questions || []).map((q: any) => q.question_id);
+      }
+
+      if (questionIds.length) {
+        await supabase.from('responses').delete().in('question_id', questionIds);
+        await supabase.from('questionoptions').delete().in('question_id', questionIds);
+        await supabase.from('questions').delete().in('question_id', questionIds);
+      }
+
+      if (assignmentIds.length) {
+        await supabase.from('assignments').delete().in('assignment_id', assignmentIds);
+      }
+
+      await supabase.from('enrollments').delete().eq('workshop_id', classId);
+
+      const { error } = await supabase
+        .from('workshops')
+        .delete()
+        .eq('workshop_id', classId);
+      if (error) throw error;
+
+      router.push('/');
+    } catch (err: any) {
+      alert(`Failed to delete: ${err.message || JSON.stringify(err)}`);
+    }
+  };
+
   useEffect(() => {
     if (classId) {
       fetchClass();
@@ -73,6 +128,13 @@ export default function ClassDetail() {
       fetchStudents();
     }
   }, [classId]);
+
+  // when class data loads, initialize title input
+  useEffect(() => {
+    if (classData) {
+      setTitleInput(classData.title);
+    }
+  }, [classData]);
 
   const handleEnrolStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,11 +199,73 @@ export default function ClassDetail() {
       {/* Header */}
       <div className="bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <Link href="/" className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
-            &larr; Back to Dashboard
+          <Link href={`/categories/${classData.category_id}`} className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
+            &larr; Back to Category
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">{classData.title}</h1>
+          <div className="flex items-center gap-2">
+            {editingTitle ? (
+              <>
+                <input
+                  value={titleInput}
+                  onChange={e => setTitleInput(e.target.value)}
+                  className="text-3xl font-bold text-gray-900 border-b-2 focus:outline-none"
+                />
+                <button
+                  onClick={async () => {
+                    if (!titleInput.trim() || !classId) return;
+                    const { error } = await supabase
+                      .from('workshops')
+                      .update({ title: titleInput })
+                      .eq('workshop_id', classId);
+                    if (error) alert(`Failed to update title: ${error.message}`);
+                    else {
+                      setClassData(prev => prev ? { ...prev, title: titleInput } : prev);
+                      setEditingTitle(false);
+                    }
+                  }}
+                  className="text-green-600 hover:text-green-800 text-sm"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingTitle(false);
+                    setTitleInput(classData.title);
+                  }}
+                  className="text-gray-600 hover:text-gray-800 text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl font-bold text-gray-900">{classData.title}</h1>
+                <button
+                  onClick={() => setEditingTitle(true)}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm ml-2"
+                >
+                  Edit
+                </button>
+              </>
+            )}
+          </div>
           <p className="text-gray-500">{classData.code}</p>
+
+          {/* analytics link and management buttons */}
+          <div className="mt-4 flex items-center gap-4">
+            <Link
+              href={`/classes/${classId}/analytics`}
+              className="inline-block bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700 text-sm"
+            >
+              View Analytics
+            </Link>
+            <button
+              onClick={handleDeleteClass}
+              className="inline-block bg-red-600 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
+            >
+              Delete Class
+            </button>
+          </div>
 
           {/* Tabs */}
           <div className="flex gap-4 mt-6 border-b border-gray-200">

@@ -85,15 +85,15 @@ export default function StudentDashboard() {
             </button>
           </header>
 
-          {/* Course Grid */}
+          {/* Workshop Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-            {workshops.map((course) => (
+            {workshops.map((workshop) => (
               <div
-                key={course.workshopId}
+                key={workshop.workshopId}
                 className="group flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-64"
               >
                 {/* Colored Header */}
-                <div className={`${course.color} h-36 relative p-4`}>
+                <div className={`${workshop.color} h-36 relative p-4`}>
                   <button className="absolute top-2 right-2 text-white/80 hover:text-white">
                     <MoreVertical size={20} />
                   </button>
@@ -103,13 +103,18 @@ export default function StudentDashboard() {
                 <div className="p-4 flex flex-col justify-between flex-1">
                   <div>
                     <h2 className="text-emerald-700 font-bold text-lg leading-tight">
-                      <Link href={`/workshops/${course.workshopId}`} className="hover:underline">
-                        {course.title}
+                      <Link href={`/workshops/${workshop.workshopId}`} className="hover:underline">
+                        {workshop.title}
                       </Link>
                     </h2>
                     <p className="text-gray-500 text-sm mt-1">
-                      {course.code} • {course.term}
+                      {workshop.code} • {workshop.term}
                     </p>
+                    {workshop.workshopDate && (
+                      <p className="text-gray-500 text-sm mt-1">
+                        Date: {new Date(workshop.workshopDate).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
 
                   {/* Action Icons (Assignments, Announcements, etc.) */}

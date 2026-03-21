@@ -12,6 +12,8 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   const [text, setText] = useState('');
   const [type, setType] = useState('text');
   const [options, setOptions] = useState('');
+  const [correctAnswer, setCorrectAnswer] = useState('');
+  const [points, setPoints] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,6 +30,8 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
             assignment_id: quizId,
             question_text: text,
             type: type,
+            correct_answer: correctAnswer || null,
+            points: points ?? 0,
             question_order: Math.floor(Math.random() * 10000) // Safe integer
           }
         ])
@@ -54,6 +58,8 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
       alert('Question created successfully!');
       setText('');
       setOptions('');
+      setCorrectAnswer('');
+      setPoints(1);
       setType('text');
       if (onQuestionCreated) onQuestionCreated();
     } catch (error: any) {
@@ -69,7 +75,12 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="text" className="block text-sm font-medium text-gray-700">Question Text</label>
+        <label
+          htmlFor="text"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Question Text
+        </label>
         <input
           id="text"
           type="text"
@@ -81,7 +92,12 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
       </div>
 
       <div>
-        <label htmlFor="type" className="block text-sm font-medium text-gray-700">Type</label>
+        <label
+          htmlFor="type"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Type
+        </label>
         <select
           id="type"
           value={type}
@@ -93,9 +109,14 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
         </select>
       </div>
 
-      {type === 'multiple-choice' && (
+      {type === "multiple-choice" && (
         <div>
-          <label htmlFor="options" className="block text-sm font-medium text-gray-700">Options (comma separated)</label>
+          <label
+            htmlFor="options"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Options (comma separated)
+          </label>
           <input
             id="options"
             type="text"
@@ -107,12 +128,46 @@ const QuestionForm = ({ quizId, onQuestionCreated }: Props) => {
         </div>
       )}
 
+      <div>
+        <label
+          htmlFor="correctAnswer"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Correct Answer (optional)
+        </label>
+        <input
+          id="correctAnswer"
+          type="text"
+          value={correctAnswer}
+          onChange={(e) => setCorrectAnswer(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 text-gray-900"
+          placeholder="Leave empty to treat all answers as correct"
+        />
+      </div>
+
+      <div>
+        <label
+          htmlFor="points"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Points (optional)
+        </label>
+        <input
+          id="points"
+          type="number"
+          min={0}
+          value={points}
+          onChange={(e) => setPoints(Number(e.target.value || 0))}
+          className="mt-1 block w-32 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 text-gray-900"
+        />
+      </div>
+
       <button
         type="submit"
         disabled={loading}
-        className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+        className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${loading ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
       >
-        {loading ? 'Saving...' : 'Save Question'}
+        {loading ? "Saving..." : "Save Question"}
       </button>
     </form>
   );
