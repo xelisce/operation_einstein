@@ -1,80 +1,99 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import RichTextEditor from "./richTextEditor";
 import "./print.css";
 import type { Project, ProjectQuestion } from "../../models/types";
 import { useAuth } from "../../useAuth";
+
 type AnswerPayload = { html: string; delta: unknown };
+
+function toSafeFilename(raw: string): string {
+  const cleaned = raw
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  return cleaned || "final-report";
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function buildExportHtml(
+  title: string,
+  questions: ProjectQuestion[],
+  answers: Record<string, AnswerPayload>,
+): string {
+  const blocks = questions
+    .map((q) => {
+      const answerHtml =
+        answers[q.projectQuestionId]?.html || "<p><em>No answer provided.</em></p>";
+      return `
+        <div style="margin-bottom:24px; page-break-inside:avoid; break-inside:avoid;">
+          <h3 style="font-size:16px; font-weight:600; margin:0 0 8px 0; color:#111111;">${escapeHtml(q.prompt)}</h3>
+          <div style="font-size:14px; line-height:1.65; color:#222222;">${answerHtml}</div>
+        </div>`;
+    })
+    .join("\n");
+
+  return `
+    <h1 style="font-size:24px; font-weight:700; margin:0 0 24px 0; color:#000000;">
+      ${escapeHtml(title)}
+    </h1>
+    ${blocks}`;
+}
 
 export default function FinalReportPage() {
   const { user } = useAuth();
   const params = useParams<{ projectId: string }>();
   const projectId = params?.projectId;
+
   const [project, setProject] = useState<Project | null>(null);
   const [questions, setQuestions] = useState<ProjectQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, AnswerPayload>>({});
-  const [isPrinting, setIsPrinting] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [isExporting, setIsExporting] = useState(false);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    const afterPrint = () => setIsPrinting(false);
-    window.addEventListener("afterprint", afterPrint);
-    return () => window.removeEventListener("afterprint", afterPrint);
-  }, []);
-
-  useEffect(() => {
-    if (!projectId || !user) return;
-    let cancelled = false;
+    if (!projectId || !user || hasFetched.current) return;
+    hasFetched.current = true;
 
     async function load() {
       setLoading(true);
       try {
         const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-        const [pRes, qRes, rRes] = await Promise.all([
+        const [pRes, qRes] = await Promise.all([
           fetch(`${base}/api/projects/${projectId}`),
           fetch(`${base}/api/projects/${projectId}/questions`),
-          fetch(`${base}/api/projects/${projectId}/responses?studentId=${user!.id}`),
         ]);
         if (!pRes.ok) throw new Error("Failed to load project");
         if (!qRes.ok) throw new Error("Failed to load questions");
-        if (!rRes.ok) throw new Error("Failed to load responses");
 
         const p: Project = await pRes.json();
         const qs: ProjectQuestion[] = await qRes.json();
-        const rs: Array<{
-          questionId: string;
-          contentHtml: string;
-          contentDelta: unknown;
-        }> = await rRes.json();
-        if (cancelled) return;
 
         setProject(p);
         setQuestions(qs);
-        const respByQ = new Map(rs.map((r) => [r.questionId, r]));
-        setAnswers(() => {
-          const next: Record<string, AnswerPayload> = {};
-          for (const q of qs) {
-            const saved = respByQ.get(q.projectQuestionId);
-            next[q.projectQuestionId] = {
-              html: saved?.contentHtml ?? "",
-              delta: saved?.contentDelta ?? null,
-            };
-          }
-          return next;
-        });
+
+        const empty: Record<string, AnswerPayload> = {};
+        for (const q of qs) {
+          empty[q.projectQuestionId] = { html: "", delta: null };
+        }
+        setAnswers(empty);
       } catch (e) {
         console.error(e);
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
 
     load();
-    return () => {
-      cancelled = true;
-    };
   }, [projectId, user]);
 
   const title = useMemo(() => {
@@ -82,42 +101,129 @@ export default function FinalReportPage() {
     return project?.title ?? "Untitled Project";
   }, [projectId, loading, project]);
 
-  const handlePrint = () => {
-    setIsPrinting(true);
-    requestAnimationFrame(() => window.print());
-  };
+  const handleExportPdf = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
 
-  const handleSave = async () => {
-    if (!projectId || !user) return;
+    let iframe: HTMLIFrameElement | null = null;
 
     try {
-      setSaveStatus("saving");
-      const base = process.env.NEXT_PUBLIC_API_BASE_URL;
-      const payload = questions.map((q) => ({
-        projectId,
-        questionId: q.projectQuestionId,
-        contentHtml: answers[q.projectQuestionId]?.html ?? "",
-        contentDelta: answers[q.projectQuestionId]?.delta ?? null,
-      }));
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas"),
+      ]);
 
-      const resp = await fetch(`${base}/api/projects/${projectId}/responses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ responses: payload, studentId: user.id }),
+      const htmlContent = buildExportHtml(title, questions, answers);
+      const filename = `${toSafeFilename(project?.title ?? "")}.pdf`;
+      iframe = document.createElement("iframe");
+      iframe.style.cssText =
+        "position:fixed; left:-9999px; top:0; width:794px; height:1123px; border:none;";
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) throw new Error("Cannot access iframe document");
+
+      iframeDoc.open();
+      iframeDoc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #ffffff;
+      color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 40px;
+      width: 794px;
+    }
+    h1 { font-size: 24px; font-weight: 700; margin: 0 0 24px 0; color: #000; }
+    h3 { font-size: 16px; font-weight: 600; margin: 0 0 8px 0; color: #111; }
+    .answer p { margin: 0 0 8px 0; }
+    .answer ul, .answer ol { margin: 4px 0 4px 20px; }
+    .answer li { margin-bottom: 2px; }
+    .answer blockquote { margin: 8px 0 8px 16px; padding-left: 10px; border-left: 3px solid #ccc; color: #555; }
+    .answer table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+    .answer th, .answer td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+    .answer th { background: #f5f5f5; font-weight: 600; }
+    .answer pre { background: #f6f6f6; padding: 8px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; }
+    .answer code { background: #f6f6f6; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+    .answer img { max-width: 100%; height: auto; }
+    .answer a { color: #1a56db; text-decoration: underline; }
+  </style>
+</head>
+<body>${htmlContent}</body>
+</html>`);
+      iframeDoc.close();
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+
+      const body = iframeDoc.body;
+      console.log("[PDF Export] iframe body size:", body.scrollWidth, "x", body.scrollHeight);
+
+      const canvas = await html2canvas(body, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: 794,
+        height: body.scrollHeight,
+        windowWidth: 794,
+        windowHeight: body.scrollHeight,
+        logging: false,
       });
-      console.log(payload);
 
-      if (!resp.ok) {
-        const txt = await resp.text();
-        console.log("Failed to save responses:", txt);
-        throw new Error(txt);
+      console.log("[PDF Export] canvas size:", canvas.width, "x", canvas.height);
+
+      const pdfWidth = 210;
+      const margin = 10;
+      const contentWidth = pdfWidth - margin * 2;
+      const contentHeight = 297 - margin * 2;
+      const scale = contentWidth / canvas.width;
+      const totalImgHeightMm = canvas.height * scale;
+
+      const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+
+      let yOffset = 0;
+      let page = 0;
+
+      while (yOffset < totalImgHeightMm) {
+        if (page > 0) doc.addPage();
+
+        const sourceY = yOffset / scale;
+        const sourceHeight = Math.min(contentHeight / scale, canvas.height - sourceY);
+        const destHeight = sourceHeight * scale;
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sourceHeight;
+        const ctx = pageCanvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(
+            canvas,
+            0, sourceY,
+            canvas.width, sourceHeight,
+            0, 0,
+            canvas.width, sourceHeight,
+          );
+          const pageImgData = pageCanvas.toDataURL("image/png");
+          doc.addImage(pageImgData, "PNG", margin, margin, contentWidth, destHeight);
+        }
+
+        yOffset += contentHeight;
+        page++;
       }
 
-      setSaveStatus("saved");
-      setTimeout(() => setSaveStatus("idle"), 1200);
+      doc.save(filename);
+      console.log("[PDF Export] success, pages:", page);
     } catch (e) {
-      console.error(e);
-      setSaveStatus("error");
+      console.error("[PDF Export] failed:", e);
+    } finally {
+      if (iframe?.parentNode) {
+        document.body.removeChild(iframe);
+      }
+      setIsExporting(false);
     }
   };
 
@@ -130,8 +236,8 @@ export default function FinalReportPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-white text-black ${isPrinting ? "print-mode" : ""}`}>
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-10 print-page">
+    <div className="min-h-screen bg-white text-black">
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-10">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">{title}</h1>
         </div>
@@ -143,32 +249,23 @@ export default function FinalReportPage() {
               value={answers[q.projectQuestionId]?.html ?? ""}
               placeholder="Write your answer here..."
               onChange={({ html, delta }) =>
-                setAnswers((a) => ({ ...a, [q.projectQuestionId]: { html, delta } }))
+                setAnswers((a) => ({
+                  ...a,
+                  [q.projectQuestionId]: { html, delta },
+                }))
               }
               className="rounded-md"
             />
           </div>
         ))}
 
-        <div className="pt-2 no-print flex gap-3">
+        <div className="pt-2 flex gap-3">
           <button
-            onClick={handleSave}
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 active:scale-[0.99]"
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {saveStatus === "saving"
-              ? "Saving..."
-              : saveStatus === "saved"
-                ? "Saved ✓"
-                : saveStatus === "error"
-                  ? "Save failed"
-                  : "Save"}
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 active:scale-[0.99]"
-          >
-            Export to PDF (Print)
+            {isExporting ? "Generating PDF…" : "Export to PDF"}
           </button>
         </div>
       </div>
