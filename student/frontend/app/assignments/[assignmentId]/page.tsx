@@ -1,40 +1,26 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import type { Assignment, Question, QuestionOption } from "../../models/types";
-import BackButton from "../../components/BackButton";
 import SubmitAssignmentButton from "./submitAssignmentButton";
 
 export const dynamic = "force-dynamic";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 async function getAssignment(assignmentId: string): Promise<Assignment> {
-  const url = `${API_BASE}/api/assignments/${assignmentId}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch assignment: ${url} (${res.status}) ${text}`);
-  }
+  const res = await fetch(`${API_BASE}/api/assignments/${assignmentId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch assignment (${res.status})`);
   return res.json();
 }
 
 async function getQuestions(assignmentId: string): Promise<Question[]> {
-  const url = `${API_BASE}/api/assignments/${assignmentId}/questions`;
-  const res = await fetch(url, { cache: "no-store" });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch questions: ${url} (${res.status}) ${text}`);
-  }
+  const res = await fetch(`${API_BASE}/api/assignments/${assignmentId}/questions`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch questions (${res.status})`);
   return res.json();
 }
 
 async function getQuestionOptions(questionId: string): Promise<QuestionOption[]> {
-  const url = `${API_BASE}/api/questions/${questionId}/options`;
-  const res = await fetch(url, { cache: "no-store" });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch options: ${url} (${res.status}) ${text}`);
-  }
+  const res = await fetch(`${API_BASE}/api/questions/${questionId}/options`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch options (${res.status})`);
   return res.json();
 }
 
@@ -47,16 +33,13 @@ export default async function AssignmentPage({
   if (!assignmentId || assignmentId === "undefined") notFound();
 
   const questionsRaw = await getQuestions(assignmentId);
-  const questions = [...questionsRaw].sort(
-    (a, b) => a.questionOrder - b.questionOrder
-  );
+  const questions = [...questionsRaw].sort((a, b) => a.questionOrder - b.questionOrder);
 
   const mcqs = questions.filter((q) => q.type === "multiple_choice");
   const optionsPairs = await Promise.all(
     mcqs.map(async (q) => {
       const opts = await getQuestionOptions(q.questionId);
-      const sorted = [...opts].sort((a, b) => a.optionOrder - b.optionOrder);
-      return [q.questionId, sorted] as const;
+      return [q.questionId, [...opts].sort((a, b) => a.optionOrder - b.optionOrder)] as const;
     })
   );
   const optionsByQuestionId: Record<string, QuestionOption[]> = Object.fromEntries(optionsPairs);
@@ -64,74 +47,76 @@ export default async function AssignmentPage({
   const assignment = await getAssignment(assignmentId);
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-      <BackButton href={`/workshops/${assignment.workshopId}`} />
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 16 }}>{assignment.title}</h1>
-      <div style={{ marginTop: 24, display: "grid", gap: 16 }}>
-        {questions.map((q) => (
-          <section
-            key={q.questionId}
-            style={{
-              border: "1px solid rgba(0,0,0,0.12)",
-              borderRadius: 12,
-              padding: 16,
-            }}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <Link
+            href={`/workshops/${assignment.workshopId}`}
+            className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block"
           >
-            <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
-              <div style={{ fontWeight: 700 }}>
-                Q{q.questionOrder}. {q.questionText}
-              </div>
-              <span style={{ fontSize: 12, opacity: 0.6 }}>{q.type}</span>
+            &larr; Back to Workshop
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900">{assignment.title}</h1>
+          {assignment.points > 0 && (
+            <p className="text-gray-500 mt-1">{assignment.points} points</p>
+          )}
+        </div>
+      </div>
+
+      {/* Questions */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-4">
+        {questions.map((q) => (
+          <div
+            key={q.questionId}
+            className="bg-white rounded-lg shadow-sm border border-gray-100 p-6"
+          >
+            <div className="flex items-baseline gap-3 mb-4">
+              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                Q{q.questionOrder}
+              </span>
+              <p className="font-semibold text-gray-900">{q.questionText}</p>
             </div>
 
             {q.type === "text" ? (
-              <div style={{ marginTop: 12 }}>
-                <textarea
-                  name={`q_${q.questionId}`}
-                  placeholder="Type your answer here..."
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    border: "1px solid rgba(0,0,0,0.15)",
-                    borderRadius: 10,
-                    padding: 12,
-                    fontSize: 14,
-                  }}
-                />
-              </div>
+              <textarea
+                name={`q_${q.questionId}`}
+                placeholder="Type your answer here..."
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 outline-none resize-none"
+              />
             ) : (
-              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              <div className="space-y-2">
                 {(optionsByQuestionId[q.questionId] ?? []).map((opt) => (
                   <label
                     key={opt.questionOptionId}
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "center",
-                      border: "1px solid rgba(0,0,0,0.1)",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      cursor: "pointer",
-                    }}
+                    className="flex items-center gap-3 border border-gray-200 rounded-lg px-4 py-3 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition"
                   >
                     <input
                       type="radio"
                       name={`q_${q.questionId}`}
                       value={opt.optionText}
+                      className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span>{opt.optionText}</span>
+                    <span className="text-sm text-gray-800">{opt.optionText}</span>
                   </label>
                 ))}
-
                 {(optionsByQuestionId[q.questionId] ?? []).length === 0 && (
-                  <div style={{ opacity: 0.7 }}>No options found.</div>
+                  <p className="text-sm text-gray-400">No options found.</p>
                 )}
               </div>
             )}
-          </section>
+          </div>
         ))}
-      </div>
-      <SubmitAssignmentButton questions={questions} workshopId={assignment.workshopId} assignmentId={assignmentId} />
-    </main>
+
+        <div className="flex justify-end pt-2">
+          <SubmitAssignmentButton
+            questions={questions}
+            workshopId={assignment.workshopId}
+            assignmentId={assignmentId}
+          />
+        </div>
+      </main>
+    </div>
   );
 }

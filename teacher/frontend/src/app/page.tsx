@@ -1,19 +1,9 @@
 'use client';
 
 import ClassManager from "@/components/ClassManager";
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function Home() {
-  const handleLogout = async () => {
-    // 1. Sign out of Supabase to clear the session
-    await supabase.auth.signOut();
-    
-    // 2. Redirect back to the main auth gateway (Student App)
+  const handleLogout = () => {
     const STUDENT_APP_URL = process.env.NEXT_PUBLIC_STUDENT_URL || '';
     window.location.href = `${STUDENT_APP_URL}/?action=logout`;
   };

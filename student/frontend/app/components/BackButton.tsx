@@ -1,36 +1,20 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
-export default function BackButton({ href }: { href?: string }) {
+export default function BackButton({ href, label = "Back" }: { href?: string; label?: string }) {
   const router = useRouter();
 
   const handleClick = () => {
-    if (href) {
-      router.push(href);
-    } else {
-      router.back();
-    }
+    if (href) router.push(href);
+    else router.back();
   };
 
   return (
     <button
       onClick={handleClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 12px",
-        border: "1px solid rgba(0,0,0,0.15)",
-        borderRadius: 8,
-        backgroundColor: "transparent",
-        cursor: "pointer",
-        fontSize: 14,
-        fontWeight: 500,
-      }}
+      className="text-sm text-indigo-600 hover:text-indigo-800 inline-block mb-2"
     >
-      <ArrowLeft size={18} />
-      Back
+      &larr; {label}
     </button>
   );
 }

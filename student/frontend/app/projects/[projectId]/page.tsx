@@ -5,6 +5,7 @@ import RichTextEditor from "./richTextEditor";
 import "./print.css";
 import type { Project, ProjectQuestion } from "../../models/types";
 import { useAuth } from "../../useAuth";
+import { authFetch } from "../../lib/auth";
 
 type AnswerPayload = { html: string; delta: unknown };
 
@@ -236,46 +237,59 @@ export default function FinalReportPage() {
 
   if (!projectId) {
     return (
-      <div className="min-h-screen bg-white text-black">
-        <div className="max-w-3xl mx-auto px-4 py-8">Loading…</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 py-8 text-gray-500">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-10">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold">{title}</h1>
-        </div>
-
-        {questions.map((q) => (
-          <div key={q.projectQuestionId} className="space-y-2 answer-block">
-            <h3 className="text-lg font-semibold">{q.prompt}</h3>
-            <RichTextEditor
-              value={answers[q.projectQuestionId]?.html ?? ""}
-              placeholder="Write your answer here..."
-              onChange={({ html, delta }) =>
-                setAnswers((a) => ({
-                  ...a,
-                  [q.projectQuestionId]: { html, delta },
-                }))
-              }
-              className="rounded-md"
-            />
-          </div>
-        ))}
-
-        <div className="pt-2 flex gap-3">
-          <button
-            onClick={handleExportPdf}
-            disabled={isExporting}
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isExporting ? "Generating PDF…" : "Export to PDF"}
-          </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <a href="javascript:history.back()" className="text-sm text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
+            &larr; Back to Workshop
+          </a>
+          <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
         </div>
       </div>
+
+      {/* Questions */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-4">
+        {loading ? (
+          <div className="text-center py-12 text-indigo-600 animate-pulse">Loading questions…</div>
+        ) : (
+          <>
+            {questions.map((q) => (
+              <div key={q.projectQuestionId} className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 answer-block">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">{q.prompt}</h3>
+                <RichTextEditor
+                  value={answers[q.projectQuestionId]?.html ?? ""}
+                  placeholder="Write your answer here..."
+                  onChange={({ html, delta }) =>
+                    setAnswers((a) => ({
+                      ...a,
+                      [q.projectQuestionId]: { html, delta },
+                    }))
+                  }
+                  className="rounded-md"
+                />
+              </div>
+            ))}
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={handleExportPdf}
+                disabled={isExporting}
+                className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 font-semibold text-sm transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isExporting ? "Generating PDF…" : "Export & Submit PDF"}
+              </button>
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

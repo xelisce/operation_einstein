@@ -1,18 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { setToken, getUser, clearToken } from './lib/auth';
 
 export default function AuthGateway() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  
-  // Auth Form State
+
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState<'student' | 'teacher'>('student');
   const [email, setEmail] = useState('');
@@ -20,70 +15,54 @@ export default function AuthGateway() {
   const [error, setError] = useState('');
 
   const TEACHER_APP_URL = process.env.NEXT_PUBLIC_TEACHER_URL;
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('action') === 'logout') {
-      supabase.auth.signOut().then(() => {
-        window.location.href = '/'; // Reload to wipe the URL clean
-      });
-      return; // Stop the rest of the effect from running
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'logout') {
+      clearToken();
+      window.history.replaceState({}, '', '/');
+      setLoading(false);
+      return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) routeUser(session.user.id);
-      else setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        routeUser(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const routeUser = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-
-      if (data.role === 'teacher') {
+    const user = getUser();
+    if (user) {
+      if (user.role === 'teacher') {
         window.location.href = `${TEACHER_APP_URL}/`;
       } else {
-        // Route students to their newly created dashboard page
-        router.push('/dashboard'); 
+        router.push('/dashboard');
       }
-    } catch (err) {
-      console.error("Error fetching role:", err);
+    } else {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-        if (authError) throw authError;
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const body: Record<string, string> = { email, password };
+      if (!isLogin) body.role = role;
+
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Authentication failed');
+
+      setToken(data.token);
+
+      if (data.role === 'teacher') {
+        window.location.href = `${TEACHER_APP_URL}/`;
       } else {
-        const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
-        if (authError) throw authError;
-        
-        if (authData.user) {
-          await supabase.from('profiles').insert([{ id: authData.user.id, email, role }]);
-        }
+        router.push('/dashboard');
       }
     } catch (err: any) {
       setError(err.message);
@@ -124,20 +103,20 @@ export default function AuthGateway() {
           {!isLogin && (
             <div className="flex gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
               <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
-                <input 
-                  type="radio" 
-                  checked={role === 'student'} 
-                  onChange={() => setRole('student')} 
+                <input
+                  type="radio"
+                  checked={role === 'student'}
+                  onChange={() => setRole('student')}
                   className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
                 />
                 Student
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
-                <input 
-                  type="radio" 
-                  checked={role === 'teacher'} 
+                <input
+                  type="radio"
+                  checked={role === 'teacher'}
                   onChange={() => setRole('teacher')}
-                  className="text-emerald-600 focus:ring-emerald-500 w-4 h-4" 
+                  className="text-emerald-600 focus:ring-emerald-500 w-4 h-4"
                 />
                 Teacher
               </label>

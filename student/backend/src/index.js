@@ -4,6 +4,10 @@ import cors from "cors";
 import supabase from "./supabaseClient.js";
 import { Resend } from "resend";
 import multer from "multer";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
+import { authenticate } from "./authMiddleware.js";
 
 const app = express();
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:3000" }));
@@ -14,6 +18,65 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 //dummy api
 app.get("/api/hello", (req, res) => {
   res.json({ ok: true, message: "Hello from the backend!" });
+});
+
+// POST /api/auth/login
+app.post("/api/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password required" });
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, email, role, password_hash")
+    .eq("email", email)
+    .single();
+
+  if (error || !data)
+    return res.status(401).json({ error: "Invalid credentials" });
+  if (!data.password_hash)
+    return res.status(401).json({ error: "Account not set up for password login" });
+
+  const valid = await bcrypt.compare(password, data.password_hash);
+  if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+  const token = jwt.sign(
+    { sub: data.id, email: data.email, role: data.role },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+  return res.json({ token, role: data.role });
+});
+
+// POST /api/auth/register
+app.post("/api/auth/register", async (req, res) => {
+  const { email, password, role = "student" } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password required" });
+
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .single();
+
+  if (existing) return res.status(409).json({ error: "Email already registered" });
+
+  const id = randomUUID();
+  const password_hash = await bcrypt.hash(password, 10);
+
+  const { error } = await supabase
+    .from("profiles")
+    .insert({ id, email, role, password_hash });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const token = jwt.sign(
+    { sub: id, email, role },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+  return res.status(201).json({ token, role });
 });
 
 //GET all workshops
@@ -89,9 +152,8 @@ app.get("/api/workshops/:workshopId/assignments", async (req, res) => {
 });
 
 //GET dashboard data for a specific student
-app.get("/api/dashboard", async (req, res) => {
-  const { studentId } = req.query;
-  if (!studentId) return res.status(400).json({ error: "studentId query param is required" });
+app.get("/api/dashboard", authenticate, async (req, res) => {
+  const studentId = req.user.sub;
   const { data: enrollments, error: eErr } = await supabase
     .from("enrollments")
     .select("workshop_id")
@@ -221,12 +283,13 @@ app.get("/api/questions/:questionId/options", async (req, res) => {
 });
 
 //POST save/update responses for an assignment per student
-app.post('/api/assignments/:assignmentId/responses', async (req, res) => {
+app.post('/api/assignments/:assignmentId/responses', authenticate, async (req, res) => {
   const { assignmentId } = req.params;
-  const { studentId, responses } = req.body;
+  const studentId = req.user.sub;
+  const { responses } = req.body;
 
-  if (!studentId || !responses) {
-    return res.status(400).json({ error: "Student ID and responses are required." });
+  if (!responses) {
+    return res.status(400).json({ error: "Responses are required." });
   }
 
   try {
@@ -314,11 +377,11 @@ app.get("/api/projects/:projectId/questions", async (req, res) => {
 });
 
 // POST save/update responses for a project per student
-app.post("/api/projects/:projectId/responses", async (req, res) => {
+app.post("/api/projects/:projectId/responses", authenticate, async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { responses, studentId } = req.body;
-    if (!studentId) return res.status(400).json({ error: "studentId is required" });
+    const studentId = req.user.sub;
+    const { responses } = req.body;
     if (!Array.isArray(responses)) return res.status(400).json({ error: "responses must be an array" });
 
     const rows = responses.map((r) => ({
@@ -344,11 +407,10 @@ app.post("/api/projects/:projectId/responses", async (req, res) => {
 });
 
 // GET all responses for a project for a specific student
-app.get("/api/projects/:projectId/responses", async (req, res) => {
+app.get("/api/projects/:projectId/responses", authenticate, async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { studentId } = req.query;
-    if (!studentId) return res.status(400).json({ error: "studentId query param is required" });
+    const studentId = req.user.sub;
 
     const { data, error } = await supabase
       .from("project_responses")
