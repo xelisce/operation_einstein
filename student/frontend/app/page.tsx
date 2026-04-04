@@ -82,9 +82,7 @@ export default function AuthGateway() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm border border-gray-200">
         <div className="flex flex-col items-center justify-center mb-8">
-          <div className="w-16 h-16 bg-emerald-600 text-white rounded-full flex items-center justify-center text-3xl font-bold mb-4">
-            V
-          </div>
+          <img src="/logo.jpg" alt="Operation Einstein" className="w-24 h-24 mb-4 object-contain" />
           <h1 className="text-2xl font-bold text-gray-900">Operation Einstein</h1>
           <p className="text-gray-500 text-sm mt-1">Science Workshop Portal</p>
         </div>

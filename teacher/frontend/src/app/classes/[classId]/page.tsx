@@ -107,6 +107,32 @@ export default function ClassDetail() {
         await supabase.from('assignments').delete().in('assignment_id', assignmentIds);
       }
 
+      // Delete projects and their questions/responses
+      const { data: projects, error: pErr } = await supabase
+        .from('projects')
+        .select('project_id')
+        .eq('workshop_id', classId);
+      if (pErr) throw pErr;
+
+      const projectIds = (projects || []).map((p: any) => p.project_id);
+
+      if (projectIds.length) {
+        const { data: projectQuestions, error: pqErr } = await supabase
+          .from('project_questions')
+          .select('question_id')
+          .in('project_id', projectIds);
+        if (pqErr) throw pqErr;
+
+        const projectQuestionIds = (projectQuestions || []).map((q: any) => q.question_id);
+
+        if (projectQuestionIds.length) {
+          await supabase.from('project_responses').delete().in('question_id', projectQuestionIds);
+          await supabase.from('project_questions').delete().in('question_id', projectQuestionIds);
+        }
+
+        await supabase.from('projects').delete().in('project_id', projectIds);
+      }
+
       await supabase.from('enrollments').delete().eq('workshop_id', classId);
 
       const { error } = await supabase
