@@ -1,0 +1,36 @@
+services:
+  student-backend:
+    build:
+      context: ./student/backend
+    container_name: student-backend
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./student/backend:/app
+      - /app/node_modules
+    env_file:
+      - ./student/backend/.env
+    networks:
+      - shared-network
+
+  student-frontend:
+    build:
+      context: ./student/frontend
+    container_name: student-frontend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./student/frontend:/app
+      - /app/node_modules
+    env_file:
+      - ./student/frontend/.env.local
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - student-backend
+    networks:
+      - shared-network
+
+networks:
+  shared-network:
+    external: true
