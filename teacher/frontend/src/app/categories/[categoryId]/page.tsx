@@ -171,6 +171,61 @@ export default function CategoryDetail() {
         }
       }
     }
+
+    // Copy projects and their questions (prompts)
+    const { data: projects, error: projErr } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('workshop_id', sourceWorkshopId);
+
+    if (projErr) {
+      console.error('Error fetching projects:', projErr);
+      return;
+    }
+
+    for (const project of projects || []) {
+      const { data: newProjData, error: newProjErr } = await supabase
+        .from('projects')
+        .insert({
+          title: project.title,
+          workshop_id: targetWorkshopId,
+        })
+        .select();
+
+      if (newProjErr) {
+        console.error('Error creating project:', newProjErr);
+        continue;
+      }
+
+      const newProjectId = newProjData[0].project_id;
+
+      // Copy project questions (prompts)
+      const { data: projQuestions, error: pqErr } = await supabase
+        .from('project_questions')
+        .select('*')
+        .eq('project_id', project.project_id);
+
+      if (pqErr) {
+        console.error('Error fetching project questions:', pqErr);
+        continue;
+      }
+
+      const newProjQuestions = (projQuestions || []).map((pq: any) => ({
+        project_id: newProjectId,
+        prompt: pq.prompt,
+        position: pq.position,
+      }));
+
+      if (newProjQuestions.length > 0) {
+        const { error: insertPqErr } = await supabase
+          .from('project_questions')
+          .insert(newProjQuestions);
+
+        if (insertPqErr) {
+          console.error('Error creating project questions:', insertPqErr);
+        }
+      }
+    }
   };
 
   const generateWorkshopCode = async () => {
@@ -284,7 +339,7 @@ export default function CategoryDetail() {
   }
 
   return (
-    <div className="p-8">
+    <div className="min-h-screen bg-gray-50 p-8">
       <div className="mb-6">
         <Link href="/" className="text-blue-600 hover:underline">← Back to Categories</Link>
       </div>

@@ -18,6 +18,12 @@ type Assignment = {
   created_at: string; // Supabase returns string timestamps
 };
 
+type Project = {
+  project_id: string;
+  title: string;
+  workshop_id: string;
+};
+
 export default function ClassDetail() {
   const params = useParams();
   const classId = params.classId as string;
@@ -25,11 +31,13 @@ export default function ClassDetail() {
   const [classData, setClassData] = useState<Workshop | null>(null);
   const [quizzes, setQuizzes] = useState<Assignment[]>([]);
   const [students, setStudents] = useState<any[]>([]); // Enrollments
+  const [projects, setProjects] = useState<Project[]>([]);
   const [newQuizTitle, setNewQuizTitle] = useState('');
+  const [newProjectTitle, setNewProjectTitle] = useState('');
   const [newStudentId, setNewStudentId] = useState(''); // For enrolling
   const [newStudentName, setNewStudentName] = useState(''); // For creating new student
   const [showNameInput, setShowNameInput] = useState(false);
-  const [activeTab, setActiveTab] = useState<'quizzes' | 'students'>('quizzes');
+  const [activeTab, setActiveTab] = useState<'quizzes' | 'students' | 'projects'>('quizzes');
   const [loading, setLoading] = useState(true);
 
   // editing title
@@ -71,6 +79,17 @@ export default function ClassDetail() {
 
     if (error) console.error(error);
     else setStudents(data || []);
+  };
+
+  const fetchProjects = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('workshop_id', classId)
+      .order('title');
+
+    if (error) console.error(error);
+    else setProjects(data || []);
   };
 
   // delete handler moved out of JSX
@@ -152,6 +171,7 @@ export default function ClassDetail() {
       fetchClass();
       fetchQuizzes();
       fetchStudents();
+      fetchProjects();
     }
   }, [classId]);
 
@@ -214,6 +234,22 @@ export default function ClassDetail() {
     } else {
       setNewQuizTitle('');
       fetchQuizzes();
+    }
+  };
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectTitle.trim()) return;
+
+    const { error } = await supabase
+      .from('projects')
+      .insert([{ workshop_id: classId, title: newProjectTitle }]);
+
+    if (error) {
+      alert(`Failed to create project: ${error.message}`);
+    } else {
+      setNewProjectTitle('');
+      fetchProjects();
     }
   };
 
@@ -306,6 +342,16 @@ export default function ClassDetail() {
               Assignments (Quizzes)
             </button>
             <button
+              onClick={() => setActiveTab('projects')}
+              className={`pb-3 px-4 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'projects' 
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Projects
+            </button>
+            <button
               onClick={() => setActiveTab('students')}
               className={`pb-3 px-4 text-sm font-medium transition-colors border-b-2 ${
                 activeTab === 'students' 
@@ -354,6 +400,51 @@ export default function ClassDetail() {
                   >
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-lg text-gray-900">{quiz.title}</h3>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'projects' && (
+          <div className="bg-white p-6 rounded-lg shadow-sm border space-y-6">
+            <div className="flex justify-between items-end border-b pb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Projects</h2>
+              <form onSubmit={handleCreateProject} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newProjectTitle}
+                  onChange={(e) => setNewProjectTitle(e.target.value)}
+                  placeholder="New Project Title"
+                  className="border rounded px-3 py-1 text-sm w-64 placeholder:text-gray-500 text-gray-900"
+                  required
+                />
+                <button type="submit" className="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700 text-sm">
+                  Create
+                </button>
+              </form>
+            </div>
+
+            {projects.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 bg-gray-50 rounded border-2 border-dashed">
+                No projects created yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {projects.map((project) => (
+                  <Link
+                    key={project.project_id}
+                    href={`/classes/${classId}/projects/${project.project_id}`}
+                    className="block border p-4 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-900">{project.title}</h3>
+                        <p className="text-sm text-gray-500">Open-ended project</p>
+                      </div>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium">Project</span>
                     </div>
                   </Link>
                 ))}
