@@ -31,6 +31,24 @@ services:
     networks:
       - shared-network
 
+  teacher-frontend:
+    build:
+      context: ./teacher/frontend
+    container_name: teacher-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./teacher/frontend:/app
+      - /app/node_modules
+    env_file:
+      - ./teacher/frontend/.env.local
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - student-frontend
+    networks:
+      - shared-network
+
 networks:
   shared-network:
     external: true
