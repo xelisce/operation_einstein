@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import StudentSearchInput from '@/components/StudentSearchInput';
 
 type Workshop = {
   workshop_id: string;
@@ -71,10 +72,10 @@ export default function ClassDetail() {
   };
 
   const fetchStudents = async () => {
-    // Fetch enrollments and join profiles table to get the name
+    // Fetch enrollments and join profiles table to get the name and email
     const { data, error } = await supabase
       .from('enrollments')
-      .select('*, profiles(name)')
+      .select('*, profiles(name, email)')
       .eq('workshop_id', classId);
 
     if (error) console.error(error);
@@ -204,7 +205,12 @@ export default function ClassDetail() {
       .insert([{ workshop_id: classId, student_id: newStudentId }]);
 
     if (enrolError) {
-      alert(`Error enrolling: ${enrolError.message}`); // Likely duplicate key if already enrolled
+      // Check if it's a duplicate key error
+      if (enrolError.message.includes('duplicate key')) {
+        alert('This student is already enrolled in this class.');
+      } else {
+        alert(`Error enrolling: ${enrolError.message}`);
+      }
     } else {
       alert('Student enrolled successfully!');
       setNewStudentId('');
@@ -455,21 +461,21 @@ export default function ClassDetail() {
 
         {activeTab === 'students' && (
           <div className="bg-white p-6 rounded-lg shadow-sm border space-y-6">
-            <div className="flex justify-between items-end border-b pb-6">
+            <div className="flex justify-between items-end border-b pb-6 gap-4">
               <h2 className="text-xl font-semibold text-gray-800">Class Roster ({students.length})</h2>
               
-              <form onSubmit={handleEnrolStudent} className="flex gap-2 items-end">
-                <div>
-                  <input
-                    type="text"
-                    value={newStudentId}
-                    onChange={(e) => setNewStudentId(e.target.value)}
-                    placeholder="Student UUID"
-                    className="border rounded px-3 py-1 text-sm w-64 placeholder:text-gray-500 text-gray-900"
-                    required
+              <form onSubmit={handleEnrolStudent} className="flex gap-2 items-end flex-1 max-w-md">
+                <div className="flex-1">
+                  <StudentSearchInput 
+                    onSelectStudent={(studentId) => setNewStudentId(studentId)}
+                    selectedStudentId={newStudentId}
                   />
                 </div>
-                <button type="submit" className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm">
+                <button 
+                  type="submit" 
+                  disabled={!newStudentId}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
                   Enrol
                 </button>
               </form>
@@ -485,6 +491,7 @@ export default function ClassDetail() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID (UUID)</th>
                     </tr>
                   </thead>
@@ -493,6 +500,9 @@ export default function ClassDetail() {
                       <tr key={s.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {s.profiles?.name || 'Unknown Name'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {s.profiles?.email || 'No email'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {s.student_id}
