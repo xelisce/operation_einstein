@@ -125,10 +125,6 @@ npm run dev
 
 ## 4. Supabase Schema
 
-The backend uses the Supabase service role key, which bypasses Row Level Security. All data access is mediated through the Express backend.
-
-There are **11 tables** in the database.
-
 ### Tables
 
 **`profiles`** — User accounts
@@ -741,28 +737,15 @@ app.use(cors({
 
 ---
 
-## 12. Known Issues & Limitations
+## 12. Known Limitations
 
-1. **Assignment submission uses DOM queries** — `submitAssignmentButton.tsx` reads form state by querying `document.querySelector` for textareas and radio buttons. This is fragile and won't work with SSR. A proper approach would use React state to track answers.
+1. **No grading or feedback system** — Students can submit responses, but there's no mechanism for teachers to grade or provide feedback through the student portal.
 
-2. **Supabase key on frontend** — The frontend `.env.local` uses the service role key as `NEXT_PUBLIC_SUPABASE_ANON_KEY`. This key is exposed to the browser. In production, use the actual anon key and enable RLS.
+2. **Images stored as base64** — The Quill editor embeds uploaded images as base64 data URIs directly in the HTML content. This bloats the database and PDFs. A production system should upload images to Supabase Storage and store URLs instead.
 
-3. **No grading or feedback system** — Students can submit responses, but there's no mechanism for teachers to grade or provide feedback through the student portal.
+3. **Resend sandbox domain** — Uses `onboarding@resend.dev` which only sends to verified email addresses. Must be replaced with a custom domain for production.
 
-4. **Images stored as base64** — The Quill editor embeds uploaded images as base64 data URIs directly in the HTML content. This bloats the database and PDFs. A production system should upload images to Supabase Storage and store URLs instead.
-
-5. **Resend sandbox domain** — Uses `onboarding@resend.dev` which only sends to verified email addresses. Must be replaced with a custom domain for production.
-
-6. **No tests** — There are no unit or integration tests for either the frontend or backend.
-
-7. **No input sanitization** — Rich text HTML from the Quill editor is stored and rendered without sanitization. This is an XSS risk.
-
-8. **Dashboard requires auth but workshop/assignment pages do not** — Anyone with a workshop or assignment ID can view questions without logging in.
-
-9. **The `/test` page** — A debug page at `/test` exposes user auth info. Should be removed or protected in production.
-
-10. **JWT secret in `.env`** — The JWT secret is committed in the `.env` file. Rotate this and use a proper secret manager in production.
-
+4. **No tests** — There are no unit or integration tests for either the frontend or backend.
 ---
 
 ## 13. Contact & Handover Notes
